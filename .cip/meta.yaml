@@ -6,7 +6,7 @@ description: "A domain-specific computational modeling language designed for inf
 version: "0.1.0"
 authors:
   - "Peter Groom, Dawn Field Institute"
-license: "MIT"
+license: "Apache-2.0"
 
 # Dawn Field Theory ecosystem links
 ecosystem_links:
