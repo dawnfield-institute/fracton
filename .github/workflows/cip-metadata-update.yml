@@ -1,0 +1,28 @@
+name: Update CIP Metadata
+'on':
+  schedule:
+  - cron: 0 2 * * 1
+  workflow_dispatch: {}
+jobs:
+  update-metadata:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    - name: Install CIP-Core
+      run: pip install cip-core
+    - name: Generate Directory Metadata
+      run: cip generate-metadata --force
+    - name: Commit Changes
+      run: "\n                              git config --local user.email \"action@github.com\"\
+        \n                              git config --local user.name \"GitHub Action\"\
+        \n                              git add -A\n                             \
+        \ git diff --staged --quiet || git commit -m \"\U0001F916 Auto-update CIP\
+        \ metadata\"\n                              git push\n                   \
+        \         "

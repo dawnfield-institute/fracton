@@ -1,16 +1,12 @@
 # CIP Metadata for Fracton SDK
-schema_version: 2.0
+schema_version: "2.0"
 repository_role: sdk
-name: "fracton-sdk"
-description: "Infodynamics Computational Modeling Language"
+title: "Fracton SDK: Infodynamics Computational Modeling Language"
+description: "A domain-specific computational modeling language designed for infodynamics research and recursive field-aware systems, providing unified substrate for modeling emergent intelligence, entropy dynamics, and bifractal computation patterns."
 version: "0.1.0"
-
-# Core repository information
-repository:
-  url: "https://github.com/dawnfield-institute/fracton"
-  type: "git"
-  primary_language: "python"
-  license: "MIT"
+authors:
+  - "Peter Groom, Dawn Field Institute"
+license: "MIT"
 
 # Dawn Field Theory ecosystem links
 ecosystem_links:
@@ -21,42 +17,23 @@ ecosystem_links:
   protocol: "repo://cip-core/"
   infrastructure: "repo://dawn-infrastructure/"
 
-# Related repositories in the ecosystem
-related_repositories:
-  - name: "dawn-field-theory"
-    url: "https://github.com/dawnfield-institute/dawn-field-theory"
-    relationship: "theory_base"
-    description: "Core theoretical foundation for infodynamics"
-  
-  - name: "cip-core"
-    url: "https://github.com/dawnfield-institute/cip-core"
-    relationship: "protocol"
-    description: "Cognition Index Protocol implementation"
-
-# Package information
-package:
-  name: "fracton"
-  install_command: "pip install fracton"
-  import_path: "fracton"
-  entry_points:
-    - "fracton-test"
-
-# Development information
-development:
-  setup_guide: "./SETUP.md"
-  testing_guide: "./tests/TESTING_GUIDE.md"
-  architecture_doc: "./ARCHITECTURE.md"
-  roadmap: "./ROADMAP.md"
-
 # Dependencies
 dependencies:
-  runtime:
-    - "numpy>=1.20.0"
-    - "scipy>=1.7.0"
-  development:
-    - "pytest>=7.0.0"
-    - "pytest-cov>=4.0.0"
-    - "pytest-mock>=3.10.0"
+  - name: "numpy"
+    type: "runtime"
+    version: ">=1.20.0"
+  - name: "scipy"
+    type: "runtime"
+    version: ">=1.7.0"
+  - name: "pytest"
+    type: "development"
+    version: ">=7.0.0"
+  - name: "pytest-cov"
+    type: "development"
+    version: ">=4.0.0"
+  - name: "pytest-mock"
+    type: "development"
+    version: ">=3.10.0"
 
 # Tags for discovery
 tags:
@@ -69,14 +46,8 @@ tags:
   - "consciousness-research"
   - "python-sdk"
 
-# Status information
-status:
-  development_stage: "alpha"
-  stability: "experimental"
-  maintenance_status: "active"
-
-# Contact information
-contact:
-  maintainer: "Dawn Field Institute"
-  email: "research@dawnfield.institute"
-  issues_url: "https://github.com/dawnfield-institute/fracton/issues"
+# Cognition metrics for CIP compliance
+cognition_metrics:
+  complexity_score: 0.8
+  comprehension_baseline: 0.75
+  last_benchmark: "2025-09-12T00:00:00Z"

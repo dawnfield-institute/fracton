@@ -1,15 +1,11 @@
 schema_version: '2.0'
 directory_name: tools
-description: Utility tools and helper scripts for fracton SDK development, debugging,
-  analysis, and maintenance operations.
+description: Provides a tool expression framework for external system integration
+  and AI/ML technology domain.
 semantic_scope:
-- development_tools
-- utilities
-- helper_scripts
-- debugging_tools
-- analysis_tools
-- maintenance_utilities
-- developer_productivity
+- machine_learning
+- artificialintelligence
+- integration_framework
 files:
 - __init__.py
 child_directories: []

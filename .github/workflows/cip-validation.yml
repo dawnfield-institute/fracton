@@ -1,0 +1,28 @@
+name: CIP Validation
+'on':
+  push:
+    branches:
+    - main
+    - develop
+  pull_request:
+    branches:
+    - main
+jobs:
+  validate-cip:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    - name: Install CIP-Core
+      run: pip install cip-core
+    - name: Validate CIP Compliance
+      run: cip validate --format=json > cip-report.json
+    - name: Upload CIP Report
+      uses: actions/upload-artifact@v3
+      with:
+        name: cip-compliance-report
+        path: cip-report.json

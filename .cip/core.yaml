@@ -1,0 +1,70 @@
+schema_version: '2.0'
+orientation_type: directory_index
+description: Directory-level orientation index for CIP navigation
+generated_date: '2025-09-10'
+primary_directories:
+  .cip:
+    semantic_scope: []
+    file_count: 0
+    schema_version: '2.0'
+  fracton:
+    semantic_scope:
+    - entropy_dynamics
+    - bifractal_computation
+    - computational_modeling_language
+    file_count: 1
+    schema_version: '2.0'
+  fracton\core:
+    semantic_scope:
+    - ai/ml
+    - gpu-accelerated computation
+    - entropy-aware routing
+    - recursive execution
+    - dynamic memory management
+    file_count: 6
+    schema_version: '2.0'
+  fracton\examples:
+    semantic_scope:
+    - ai/ml
+    - infodynamics
+    - recursive computation
+    - cognitive modeling
+    - computational linguistics
+    file_count: 2
+    schema_version: '2.0'
+  fracton\lang:
+    semantic_scope:
+    - ai/ml
+    - dependency_resolution
+    - machine_learning
+    - data_integration
+    file_count: 5
+    schema_version: '2.0'
+  fracton\tools:
+    semantic_scope:
+    - machine_learning
+    - artificialintelligence
+    - integration_framework
+    file_count: 1
+    schema_version: '2.0'
+  tests:
+    semantic_scope:
+    - ai/ml
+    - testing
+    - config
+    file_count: 14
+    schema_version: '2.0'
+document_categories:
+  theory: []
+  experiments:
+  - .
+  - tests
+  blueprints: []
+  tools: []
+  documentation: []
+navigation_hints:
+  foundational_theory: foundational/
+  experiments: experiments/ and blueprints/
+  tools_utilities: tools/ and devkit/
+  protocol_specs: cognition_index_protocol/
+  development: sdk/ and models/
