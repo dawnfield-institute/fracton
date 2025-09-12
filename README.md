@@ -1,6 +1,6 @@
 # Fracton: Infodynamics Computational Modeling Language
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Development Status](https://img.shields.io/badge/status-alpha-orange.svg)](https://github.com/dawnfield-institute/fracton)
 
@@ -246,4 +246,4 @@ Fracton is part of the larger Dawn Field Theory ecosystem:
 
 ## License
 
-MIT License - See LICENSE file for details
+Apache License 2.0 - See LICENSE file for details
