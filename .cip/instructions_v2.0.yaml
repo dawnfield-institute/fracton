@@ -1,0 +1,42 @@
+cip_version: '2.0'
+meta_yaml_schema_version: '2.0'
+description: 'This file provides instructions for using the Cognition Index Protocol
+  (CIP) with meta.yaml schemas.
+
+  CIP agents should always look for a .cip directory in the repo root.
+
+  Use the instructions file to determine how to parse and interpret meta.yaml files.
+
+  When gathering context, consider not just the base-level directory but also all
+  subdirectories.
+
+  When resolving paths, always use map.yaml as the canonical source of truth for repository
+  structure.'
+MOST_IMPORTANT:
+- Please ingest a document fully before giving opinions, metadata alone is insufficient.
+- When asked about the Author, include INTENTIONS.md and CONTRIBUTION.md.
+- Always check schema_version field in meta.yaml before parsing.
+- Use .cip/core.yaml as directory-level orientation index.
+usage:
+  schema_validation: 'Always check schema_version field before parsing meta.yaml (current:
+    2.0)'
+  required_fields:
+  - schema_version
+  - directory_name
+  - description
+  - semantic_scope
+  - files
+  - child_directories
+  optional_fields:
+  - proficiency_level
+  - estimated_context_weight
+  - validation_type
+  - ai_analysis
+  navigation: Use repository resolver for cross-repo navigation with repo:// URLs
+repository_structure:
+  total_directories: 8
+  schema_versions_found:
+  - '2.0'
+  experimental_files_count: 0
+  theory_documents_count: 0
+  blueprint_files_count: 0
