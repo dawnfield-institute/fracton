@@ -237,6 +237,13 @@ Fracton is part of the larger Dawn Field Theory ecosystem:
 - **Testing Guide**: [tests/TESTING_GUIDE.md](./tests/TESTING_GUIDE.md)
 - **Roadmap**: [ROADMAP.md](./ROADMAP.md)
 
+## Development
+
+- **Development Roadmap**: [roadmaps/fracton_roadmap.md](./roadmaps/fracton_roadmap.md)
+- **Current Tasks**: [todo/fracton_todo.md](./todo/fracton_todo.md)
+- **Contributing**: See contributing guidelines in the main repository
+- **Issues**: [GitHub Issues](https://github.com/dawnfield-institute/fracton/issues)
+
 ## License
 
 MIT License - See LICENSE file for details

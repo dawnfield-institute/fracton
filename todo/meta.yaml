@@ -1,0 +1,17 @@
+schema_version: "2.0"
+directory_purpose: "todo"
+description: "Task tracking and development todo items for Fracton SDK, including current sprint items, research goals, technical debt, and future vision planning"
+contents:
+  - fracton_todo.md: "Main todo list covering current sprint tasks, research objectives, known issues, technical debt, and long-term development goals"
+  
+tags:
+  - "todo"
+  - "tasks"
+  - "development"
+  - "tracking"
+  - "sprint"
+  - "backlog"
+  
+priority: "high" 
+maintenance_frequency: "weekly"
+last_updated: "2025-09-12"

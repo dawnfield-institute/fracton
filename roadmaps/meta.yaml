@@ -1,0 +1,16 @@
+schema_version: "2.0"
+directory_purpose: "roadmaps"
+description: "Development roadmaps and strategic planning for Fracton SDK evolution, including technical milestones, research directions, and ecosystem integration plans"
+contents:
+  - fracton_roadmap.md: "Main development roadmap covering core stabilization, advanced features, distributed computing, and ecosystem integration phases"
+  
+tags:
+  - "roadmap"
+  - "planning" 
+  - "development"
+  - "strategy"
+  - "milestones"
+  
+priority: "high"
+maintenance_frequency: "quarterly"
+last_updated: "2025-09-12"
