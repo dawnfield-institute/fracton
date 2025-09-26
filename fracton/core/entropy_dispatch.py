@@ -573,3 +573,249 @@ _default_dispatcher = EntropyDispatcher()
 def get_default_dispatcher() -> EntropyDispatcher:
     """Get the default global dispatcher instance."""
     return _default_dispatcher
+
+
+class PhysicsEntropyDispatcher(EntropyDispatcher):
+    """
+    Specialized entropy dispatcher for physics-based computations.
+    
+    Extends the base EntropyDispatcher with physics-specific routing
+    capabilities for Klein-Gordon field evolution, PAC conservation,
+    and other physics operations based on entropy state.
+    """
+    
+    def __init__(self, xi_target: float = 1.0571, 
+                 conservation_strictness: float = 1e-12):
+        super().__init__()
+        self.xi_target = xi_target
+        self.conservation_strictness = conservation_strictness
+        
+        # Register physics-specific entropy patterns
+        self._register_physics_patterns()
+    
+    def _register_physics_patterns(self):
+        """Register physics-specific entropy dispatch patterns."""
+        
+        # High entropy: Field exploration and variant generation
+        self.register_entropy_pattern(
+            name="physics_exploration",
+            entropy_range=(0.7, 1.0),
+            operations=["field_exploration", "conservation_checking", "variant_generation"]
+        )
+        
+        # Medium entropy: Klein-Gordon evolution
+        self.register_entropy_pattern(
+            name="field_evolution", 
+            entropy_range=(0.3, 0.7),
+            operations=["klein_gordon_step", "pac_conservation", "energy_tracking"]
+        )
+        
+        # Low entropy: Field crystallization and optimization
+        self.register_entropy_pattern(
+            name="field_crystallization",
+            entropy_range=(0.0, 0.3),
+            operations=["field_optimization", "pattern_matching", "state_consolidation"]
+        )
+    
+    def register_entropy_pattern(self, name: str, entropy_range: tuple, operations: list):
+        """Register a named entropy pattern with associated operations."""
+        if not hasattr(self, '_entropy_patterns'):
+            self._entropy_patterns = {}
+        
+        self._entropy_patterns[name] = {
+            'entropy_range': entropy_range,
+            'operations': operations
+        }
+    
+    def dispatch_physics_operation(self, operation_type: str, context: ExecutionContext, 
+                                 memory_field, **kwargs) -> Any:
+        """
+        Dispatch physics operation based on entropy state and operation type.
+        
+        Args:
+            operation_type: Type of physics operation to perform
+            context: Current execution context
+            memory_field: Physics memory field to operate on
+            **kwargs: Additional operation parameters
+            
+        Returns:
+            Result of the physics operation
+        """
+        entropy = context.entropy
+        
+        # Route based on entropy and operation type
+        if operation_type == "klein_gordon_evolution":
+            return self._dispatch_klein_gordon(entropy, memory_field, **kwargs)
+        elif operation_type == "pac_conservation":
+            return self._dispatch_pac_conservation(entropy, memory_field, **kwargs)
+        elif operation_type == "pattern_amplification":
+            return self._dispatch_pattern_amplification(entropy, memory_field, **kwargs)
+        elif operation_type == "field_collapse":
+            return self._dispatch_field_collapse(entropy, memory_field, **kwargs)
+        else:
+            # Fallback to standard entropy dispatch
+            return super().dispatch(context, memory_field)
+    
+    def _dispatch_klein_gordon(self, entropy: float, memory_field, dt: float = 0.01, 
+                              mass_squared: float = 0.1) -> Any:
+        """Dispatch Klein-Gordon evolution based on entropy state."""
+        
+        if entropy > 0.7:
+            # High entropy: Exploratory evolution with multiple steps
+            result = memory_field.evolve_klein_gordon(dt * 0.5, mass_squared)
+            # Additional exploratory step
+            memory_field.evolve_klein_gordon(dt * 0.5, mass_squared * 1.1)
+            return result
+            
+        elif entropy > 0.3:
+            # Medium entropy: Standard evolution
+            return memory_field.evolve_klein_gordon(dt, mass_squared)
+            
+        else:
+            # Low entropy: Conservative evolution with smaller steps
+            return memory_field.evolve_klein_gordon(dt * 0.1, mass_squared)
+    
+    def _dispatch_pac_conservation(self, entropy: float, memory_field, 
+                                  tolerance: float = None) -> bool:
+        """Dispatch PAC conservation enforcement based on entropy state."""
+        
+        if tolerance is None:
+            tolerance = self.conservation_strictness
+            
+        if entropy > 0.7:
+            # High entropy: Relaxed conservation for exploration
+            return memory_field.enforce_pac_conservation(tolerance * 10)
+            
+        elif entropy > 0.3:
+            # Medium entropy: Standard conservation
+            return memory_field.enforce_pac_conservation(tolerance)
+            
+        else:
+            # Low entropy: Strict conservation
+            return memory_field.enforce_pac_conservation(tolerance * 0.1)
+    
+    def _dispatch_pattern_amplification(self, entropy: float, memory_field, 
+                                       pattern, amplification_factor: float = 1.0) -> Any:
+        """Dispatch pattern amplification based on entropy state."""
+        
+        field_data = memory_field.get('field_data')
+        if field_data is None:
+            return None
+            
+        if entropy > 0.7:
+            # High entropy: Strong amplification
+            amplified = self._amplify_pattern(field_data, pattern, 
+                                            amplification_factor * entropy * 2.0)
+            
+        elif entropy > 0.3:
+            # Medium entropy: Moderate amplification  
+            amplified = self._amplify_pattern(field_data, pattern, 
+                                            amplification_factor * entropy)
+            
+        else:
+            # Low entropy: Minimal amplification
+            amplified = self._amplify_pattern(field_data, pattern, 
+                                            amplification_factor * 0.1)
+        
+        memory_field.set('field_data', amplified)
+        return amplified
+    
+    def _dispatch_field_collapse(self, entropy: float, memory_field, 
+                                threshold: float = 0.3) -> Any:
+        """Dispatch field collapse based on entropy state."""
+        
+        if entropy > 0.7:
+            # High entropy: Delayed collapse
+            return None  # No collapse at high entropy
+            
+        elif entropy > threshold:
+            # Medium entropy: Gradual collapse
+            field_data = memory_field.get('field_data')
+            if field_data is not None:
+                collapsed = self._gradual_collapse(field_data, collapse_rate=0.1)
+                memory_field.set('field_data', collapsed)
+                return collapsed
+                
+        else:
+            # Low entropy: Rapid collapse
+            field_data = memory_field.get('field_data')
+            if field_data is not None:
+                collapsed = self._rapid_collapse(field_data)
+                memory_field.set('field_data', collapsed)
+                return collapsed
+        
+        return None
+    
+    def _amplify_pattern(self, field_data, pattern, factor: float):
+        """Amplify pattern in field data while maintaining physics constraints."""
+        import numpy as np
+        
+        if len(pattern) != len(field_data):
+            # Resize pattern to match field
+            pattern = np.interp(np.linspace(0, 1, len(field_data)), 
+                              np.linspace(0, 1, len(pattern)), pattern)
+        
+        # Weighted amplification
+        weight = min(factor, 2.0)  # Cap amplification
+        amplified = field_data * (1 - weight * 0.1) + pattern * (weight * 0.1)
+        
+        # Maintain field norm (energy conservation)
+        original_norm = np.linalg.norm(field_data)
+        new_norm = np.linalg.norm(amplified)
+        if new_norm > 1e-12:
+            amplified = amplified * (original_norm / new_norm)
+            
+        return amplified
+    
+    def _gradual_collapse(self, field_data, collapse_rate: float = 0.1):
+        """Gradual field collapse preserving dominant modes."""
+        import numpy as np
+        
+        # Find dominant components
+        abs_field = np.abs(field_data)
+        threshold = np.percentile(abs_field, (1 - collapse_rate) * 100)
+        
+        # Preserve strong components, reduce weak ones
+        collapsed = field_data.copy()
+        mask = abs_field < threshold
+        collapsed[mask] *= 0.5  # Reduce weak components
+        
+        return collapsed
+    
+    def _rapid_collapse(self, field_data):
+        """Rapid collapse to dominant mode."""
+        import numpy as np
+        
+        # Find strongest component
+        max_idx = np.argmax(np.abs(field_data))
+        max_value = field_data[max_idx]
+        
+        # Create collapsed state
+        collapsed = np.zeros_like(field_data)
+        collapsed[max_idx] = max_value
+        
+        # Maintain some field energy distribution
+        total_energy = np.sum(field_data**2)
+        collapsed_energy = collapsed[max_idx]**2
+        
+        if collapsed_energy > 1e-12:
+            # Distribute some energy to neighbors
+            if max_idx > 0:
+                collapsed[max_idx-1] = max_value * 0.1
+            if max_idx < len(collapsed) - 1:
+                collapsed[max_idx+1] = max_value * 0.1
+        
+        return collapsed
+    
+    def get_physics_patterns(self) -> Dict[str, Dict]:
+        """Get registered physics entropy patterns."""
+        return getattr(self, '_entropy_patterns', {})
+
+
+# Global physics dispatcher instance
+_physics_dispatcher = PhysicsEntropyDispatcher()
+
+
+def get_physics_dispatcher() -> PhysicsEntropyDispatcher:
+    """Get the default global physics dispatcher instance."""
+    return _physics_dispatcher

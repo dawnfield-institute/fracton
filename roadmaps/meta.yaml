@@ -1,16 +1,17 @@
-schema_version: "2.0"
-directory_purpose: "roadmaps"
-description: "Development roadmaps and strategic planning for Fracton SDK evolution, including technical milestones, research directions, and ecosystem integration plans"
-contents:
-  - fracton_roadmap.md: "Main development roadmap covering core stabilization, advanced features, distributed computing, and ecosystem integration phases"
-  
-tags:
-  - "roadmap"
-  - "planning" 
-  - "development"
-  - "strategy"
-  - "milestones"
-  
-priority: "high"
-maintenance_frequency: "quarterly"
-last_updated: "2025-09-12"
+schema_version: '2.0'
+directory_name: roadmaps
+description: The roadmaps directory contains documentation and reference materials
+  for roadmaps. It includes explanatory documents that help users understand and work
+  with this component.
+semantic_scope:
+- roadmaps
+files:
+- fracton_roadmap.md
+child_directories: []
+generation_context:
+  generator: ai_enhanced
+  file_count: 2
+  directory_count: 0
+  primary_file_types:
+    .md: 1
+    .yaml: 1

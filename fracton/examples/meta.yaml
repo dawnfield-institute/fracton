@@ -1,14 +1,19 @@
 schema_version: '2.0'
 directory_name: examples
-description: This directory implements Fracton-based GAIA integration for enhanced
-  recursive cognition and infodynamics research applications.
+description: The examples directory is a Python package containing examples modules
+  and functionality. It provides a structured collection of related code organized
+  for easy import and use.
 semantic_scope:
-- ai/ml
-- infodynamics
-- recursive computation
-- cognitive modeling
-- computational linguistics
+- examples
+- demonstrations
 files:
 - __init__.py
 - gaia_integration.py
 child_directories: []
+generation_context:
+  generator: ai_enhanced
+  file_count: 3
+  directory_count: 0
+  primary_file_types:
+    .py: 2
+    .yaml: 1

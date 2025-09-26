@@ -1,10 +1,10 @@
 schema_version: '2.0'
 directory_name: fracton
-description: ''
+description: The fracton directory is a Python package containing fracton modules
+  and functionality. It provides a structured collection of related code organized
+  for easy import and use.
 semantic_scope:
-- entropy_dynamics
-- bifractal_computation
-- computational_modeling_language
+- fracton
 files:
 - __init__.py
 child_directories:
@@ -12,3 +12,10 @@ child_directories:
 - examples
 - lang
 - tools
+generation_context:
+  generator: ai_enhanced
+  file_count: 2
+  directory_count: 4
+  primary_file_types:
+    .py: 1
+    .yaml: 1

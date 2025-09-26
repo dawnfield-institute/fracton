@@ -1,0 +1,18 @@
+schema_version: '2.0'
+directory_name: examples
+description: The examples directory contains Python modules implementing examples
+  functionality. It houses the core logic and implementation details for this component
+  of the system.
+semantic_scope:
+- examples
+- demonstrations
+files:
+- pac_native_demo.py
+child_directories: []
+generation_context:
+  generator: ai_enhanced
+  file_count: 2
+  directory_count: 0
+  primary_file_types:
+    .yaml: 1
+    .py: 1

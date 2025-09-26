@@ -1,0 +1,16 @@
+schema_version: '2.0'
+directory_name: cognition
+description: The cognition directory implements the Cognition Index Protocol (CIP)
+  validation framework. It contains validation questions, answers, and assessment
+  tools that test AI comprehension of the repository contents.
+semantic_scope:
+- cognition_index
+- cip_protocol
+files: []
+child_directories: []
+generation_context:
+  generator: ai_enhanced
+  file_count: 1
+  directory_count: 0
+  primary_file_types:
+    .yaml: 1
