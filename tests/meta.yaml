@@ -1,10 +1,11 @@
 schema_version: '2.0'
 directory_name: tests
-description: ''
+description: The tests directory contains test suites and testing utilities for testing.
+  It includes unit tests, integration tests, and test fixtures to ensure code quality
+  and reliability.
 semantic_scope:
-- ai/ml
 - testing
-- config
+- quality_assurance
 files:
 - __init__.py
 - conftest.py
@@ -21,3 +22,11 @@ files:
 - test_sec_compliance.py
 - TESTING_GUIDE.md
 child_directories: []
+generation_context:
+  generator: ai_enhanced
+  file_count: 15
+  directory_count: 0
+  primary_file_types:
+    .py: 12
+    .yaml: 1
+    .md: 2

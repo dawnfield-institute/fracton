@@ -1,12 +1,10 @@
 schema_version: '2.0'
 directory_name: lang
-description: Handles language AI integration for enhanced metadata generation and semantic
-  analysis.
+description: The lang directory is a Python package containing lang modules and functionality.
+  It provides a structured collection of related code organized for easy import and
+  use.
 semantic_scope:
-- ai/ml
-- dependency_resolution
-- machine_learning
-- data_integration
+- lang
 files:
 - __init__.py
 - compiler.py
@@ -14,3 +12,10 @@ files:
 - decorators.py
 - primitives.py
 child_directories: []
+generation_context:
+  generator: ai_enhanced
+  file_count: 6
+  directory_count: 0
+  primary_file_types:
+    .py: 5
+    .yaml: 1

@@ -31,20 +31,34 @@ Example Usage:
         result = fibonacci_field(field, context)
 """
 
-# Core runtime components
+# Core runtime components with native PAC self-regulation
 from .core import (
     RecursiveExecutor, ExecutionContext, 
     EntropyDispatcher, DispatchConditions,
     BifractalTrace, TraceAnalysis,
     MemoryField, FieldController,
-    memory_field
+    memory_field,
+    # Native PAC regulation
+    PACRegulator, PACRecursiveContext, pac_recursive,
+    get_global_pac_regulator, validate_pac_conservation,
+    enable_pac_self_regulation, get_system_pac_metrics,
+    # Physics capabilities
+    PhysicsRecursiveExecutor, get_physics_executor, recursive_physics,
+    PhysicsEntropyDispatcher, get_physics_dispatcher,
+    PhysicsMemoryField, physics_memory_field
 )
 
 # Language constructs
 from .lang import (
     recursive, entropy_gate, tool_binding, tail_recursive,
     recurse, crystallize, branch, merge_contexts,
-    Context, create_context
+    Context, create_context,
+    # Physics primitives
+    physics_primitive, conservation_primitive,
+    klein_gordon_evolution, enforce_pac_conservation,
+    calculate_balance_operator, field_pattern_matching,
+    resonance_field_interaction, entropy_driven_collapse,
+    cognitive_pattern_extraction, superfluid_memory_dynamics
 )
 
 # Version info
@@ -60,11 +74,18 @@ __all__ = [
     "Context",
     "create_context",
     
+    # Physics execution
+    "PhysicsRecursiveExecutor",
+    "get_physics_executor",
+    
     # Decorators
     "recursive",
+    "recursive_physics",
     "entropy_gate",
     "tool_binding", 
     "tail_recursive",
+    "physics_primitive",
+    "conservation_primitive",
     
     # Runtime functions
     "recurse",
@@ -72,22 +93,46 @@ __all__ = [
     "branch",
     "merge_contexts",
     
+    # Physics primitives
+    "klein_gordon_evolution",
+    "enforce_pac_conservation", 
+    "calculate_balance_operator",
+    "field_pattern_matching",
+    "resonance_field_interaction",
+    "entropy_driven_collapse",
+    "cognitive_pattern_extraction",
+    "superfluid_memory_dynamics",
+    
     # Memory management
     "MemoryField",
+    "PhysicsMemoryField",
     "FieldController",
     "memory_field",
+    "physics_memory_field",
     
     # Dispatch and analysis
     "EntropyDispatcher",
+    "PhysicsEntropyDispatcher",
+    "get_physics_dispatcher",
     "DispatchConditions",
     "BifractalTrace",
     "TraceAnalysis",
+    
+    # Native PAC self-regulation
+    "PACRegulator",
+    "PACRecursiveContext", 
+    "pac_recursive",
+    "get_global_pac_regulator",
+    "validate_pac_conservation",
+    "enable_pac_self_regulation",
+    "get_system_pac_metrics",
     
     # Utilities
     "initialize_field",
     "analyze_trace",
     "visualize_trace",
-    "express_tool"
+    "express_tool",
+    "create_physics_engine"
 ]
 
 
@@ -274,5 +319,71 @@ def get_runtime_stats() -> dict:
         'execution': exec_stats.__dict__ if hasattr(exec_stats, '__dict__') else {},
         'dispatch': dispatch_stats,
         'memory_fields': len(controller.get_all_fields()),
+        'version': __version__
+    }
+
+
+def create_physics_engine(xi_target: float = 1.0571, 
+                         conservation_strictness: float = 1e-12,
+                         field_dimensions: tuple = (32,),
+                         enable_pac_regulation: bool = True) -> dict:
+    """
+    Create a complete physics engine with native PAC self-regulation.
+    
+    Returns a configured physics system with recursive executor,
+    entropy dispatcher, and physics memory field ready for
+    Klein-Gordon evolution and automatic PAC conservation.
+    
+    Args:
+        xi_target: Target balance operator value (default: 1.0571)
+        conservation_strictness: PAC conservation tolerance
+        field_dimensions: Physics field dimensions
+        enable_pac_regulation: Enable automatic PAC validation
+        
+    Returns:
+        Dictionary containing configured physics components
+        
+    Example:
+        engine = fracton.create_physics_engine()
+        with engine['memory_field'] as physics_memory:
+            result = engine['executor'].execute_with_physics(
+                my_physics_function, physics_memory, context
+            )
+    """
+    # Create physics components with PAC regulation
+    physics_executor = PhysicsRecursiveExecutor(
+        xi_target=xi_target,
+        conservation_strictness=conservation_strictness,
+        pac_regulation=enable_pac_regulation
+    )
+    
+    physics_dispatcher = PhysicsEntropyDispatcher(
+        xi_target=xi_target,
+        conservation_strictness=conservation_strictness
+    )
+    
+    # Enable global PAC regulation if requested
+    pac_regulator = None
+    if enable_pac_regulation:
+        pac_regulator = enable_pac_self_regulation()
+    
+    # Link executor and dispatcher
+    physics_executor.set_physics_dispatcher(physics_dispatcher)
+    
+    return {
+        'executor': physics_executor,
+        'dispatcher': physics_dispatcher,
+        'memory_field': physics_memory_field(
+            capacity=2000,
+            entropy=0.5,
+            physics_dimensions=field_dimensions,
+            conservation_strictness=conservation_strictness,
+            xi_target=xi_target
+        ),
+        'pac_regulator': pac_regulator,
+        'xi_target': xi_target,
+        'conservation_strictness': conservation_strictness,
+        'field_dimensions': field_dimensions,
+        'pac_enabled': enable_pac_regulation,
         'version': __version__
     }

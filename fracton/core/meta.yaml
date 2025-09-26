@@ -1,19 +1,23 @@
 schema_version: '2.0'
 directory_name: core
-description: The core directory provides a comprehensive runtime engine for Fracton
-  recursive functions, implementing intelligent function dispatch, bifractal tracing,
-  and memory field management to support high-performance infodynamics computing.
+description: The core directory is a Python package containing core modules and functionality.
+  It provides a structured collection of related code organized for easy import and
+  use.
 semantic_scope:
-- ai/ml
-- gpu-accelerated computation
-- entropy-aware routing
-- recursive execution
-- dynamic memory management
+- core
 files:
 - __init__.py
 - bifractal_trace.py
 - entropy_dispatch.py
 - gpu_accelerated_memory_field.py
 - memory_field.py
+- pac_regulation.py
 - recursive_engine.py
 child_directories: []
+generation_context:
+  generator: ai_enhanced
+  file_count: 8
+  directory_count: 0
+  primary_file_types:
+    .py: 7
+    .yaml: 1

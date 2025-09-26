@@ -4,63 +4,77 @@ description: Directory-level orientation index for CIP navigation
 generated_date: '2025-09-10'
 primary_directories:
   .cip:
-    semantic_scope: []
+    semantic_scope:
+    - .cip
+    file_count: 2
+    schema_version: '2.0'
+  cognition:
+    semantic_scope:
+    - cognition_index
+    - cip_protocol
     file_count: 0
+    schema_version: '2.0'
+  examples:
+    semantic_scope:
+    - examples
+    - demonstrations
+    file_count: 1
     schema_version: '2.0'
   fracton:
     semantic_scope:
-    - entropy_dynamics
-    - bifractal_computation
-    - computational_modeling_language
+    - fracton
     file_count: 1
     schema_version: '2.0'
   fracton\core:
     semantic_scope:
-    - ai/ml
-    - gpu-accelerated computation
-    - entropy-aware routing
-    - recursive execution
-    - dynamic memory management
-    file_count: 6
+    - core
+    file_count: 7
     schema_version: '2.0'
   fracton\examples:
     semantic_scope:
-    - ai/ml
-    - infodynamics
-    - recursive computation
-    - cognitive modeling
-    - computational linguistics
+    - examples
+    - demonstrations
     file_count: 2
     schema_version: '2.0'
   fracton\lang:
     semantic_scope:
-    - ai/ml
-    - dependency_resolution
-    - machine_learning
-    - data_integration
+    - lang
     file_count: 5
     schema_version: '2.0'
   fracton\tools:
     semantic_scope:
-    - machine_learning
-    - artificialintelligence
-    - integration_framework
+    - tools
+    - utilities
+    file_count: 1
+    schema_version: '2.0'
+  gaia:
+    semantic_scope:
+    - gaia
+    file_count: 0
+    schema_version: '2.0'
+  roadmaps:
+    semantic_scope:
+    - roadmaps
     file_count: 1
     schema_version: '2.0'
   tests:
     semantic_scope:
-    - ai/ml
     - testing
-    - config
+    - quality_assurance
     file_count: 14
+    schema_version: '2.0'
+  todo:
+    semantic_scope:
+    - todo
+    file_count: 1
     schema_version: '2.0'
 document_categories:
   theory: []
   experiments:
-  - .
   - tests
   blueprints: []
-  tools: []
+  tools:
+  - fracton\tools
   documentation: []
 navigation_hints:
   foundational_theory: foundational/

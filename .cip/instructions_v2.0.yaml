@@ -34,7 +34,7 @@ usage:
   - ai_analysis
   navigation: Use repository resolver for cross-repo navigation with repo:// URLs
 repository_structure:
-  total_directories: 8
+  total_directories: 13
   schema_versions_found:
   - '2.0'
   experimental_files_count: 0

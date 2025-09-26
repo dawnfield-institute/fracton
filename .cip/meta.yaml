@@ -1,53 +1,17 @@
-# CIP Metadata for Fracton SDK
-schema_version: "2.0"
-repository_role: sdk
-title: "Fracton SDK: Infodynamics Computational Modeling Language"
-description: "A domain-specific computational modeling language designed for infodynamics research and recursive field-aware systems, providing unified substrate for modeling emergent intelligence, entropy dynamics, and bifractal computation patterns."
-version: "0.1.0"
-authors:
-  - "Peter Groom, Dawn Field Institute"
-license: "Apache-2.0"
-
-# Dawn Field Theory ecosystem links
-ecosystem_links:
-  theory: "repo://dawn-field-theory/foundational/"
-  sdk: "repo://fracton-sdk/"
-  devkit: "repo://dawn-devkit/"
-  models: "repo://dawn-models/"
-  protocol: "repo://cip-core/"
-  infrastructure: "repo://dawn-infrastructure/"
-
-# Dependencies
-dependencies:
-  - name: "numpy"
-    type: "runtime"
-    version: ">=1.20.0"
-  - name: "scipy"
-    type: "runtime"
-    version: ">=1.7.0"
-  - name: "pytest"
-    type: "development"
-    version: ">=7.0.0"
-  - name: "pytest-cov"
-    type: "development"
-    version: ">=4.0.0"
-  - name: "pytest-mock"
-    type: "development"
-    version: ">=3.10.0"
-
-# Tags for discovery
-tags:
-  - "infodynamics"
-  - "computational-modeling"
-  - "recursive-computation"
-  - "entropy-dispatch"
-  - "field-aware-memory"
-  - "bifractal-tracing"
-  - "consciousness-research"
-  - "python-sdk"
-
-# Cognition metrics for CIP compliance
-cognition_metrics:
-  complexity_score: 0.8
-  comprehension_baseline: 0.75
-  last_benchmark: "2025-09-12T00:00:00Z"
+schema_version: '2.0'
+directory_name: .cip
+description: The .cip directory contains configuration and metadata files for .cip.
+  It houses YAML definitions, configuration templates, and structured data that define
+  system behavior.
+semantic_scope:
+- .cip
+files:
+- core.yaml
+- instructions_v2.0.yaml
+child_directories: []
+generation_context:
+  generator: ai_enhanced
+  file_count: 3
+  directory_count: 0
+  primary_file_types:
+    .yaml: 3

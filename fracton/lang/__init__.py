@@ -7,7 +7,14 @@ and optional DSL compilation.
 """
 
 from .decorators import recursive, entropy_gate, tool_binding, tail_recursive
-from .primitives import recurse, crystallize, branch, merge_contexts
+from .primitives import (
+    recurse, crystallize, branch, merge_contexts,
+    physics_primitive, conservation_primitive,
+    klein_gordon_evolution, enforce_pac_conservation,
+    calculate_balance_operator, field_pattern_matching,
+    resonance_field_interaction, entropy_driven_collapse,
+    cognitive_pattern_extraction, superfluid_memory_dynamics
+)
 from .context import Context, create_context
 from .compiler import compile_fracton_dsl
 
@@ -21,6 +28,16 @@ __all__ = [
     "crystallize",
     "branch",
     "merge_contexts",
+    "physics_primitive",
+    "conservation_primitive",
+    "klein_gordon_evolution",
+    "enforce_pac_conservation",
+    "calculate_balance_operator",
+    "field_pattern_matching",
+    "resonance_field_interaction",
+    "entropy_driven_collapse",
+    "cognitive_pattern_extraction", 
+    "superfluid_memory_dynamics",
     "Context",
     "create_context",
     "compile_fracton_dsl"

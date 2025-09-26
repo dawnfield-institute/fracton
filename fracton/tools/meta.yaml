@@ -1,11 +1,18 @@
 schema_version: '2.0'
 directory_name: tools
-description: Provides a tool expression framework for external system integration
-  and AI/ML technology domain.
+description: The tools directory contains utility tools and scripts for tools. It
+  provides helpful automation, build tools, and administrative scripts for development
+  and maintenance.
 semantic_scope:
-- machine_learning
-- artificialintelligence
-- integration_framework
+- tools
+- utilities
 files:
 - __init__.py
 child_directories: []
+generation_context:
+  generator: ai_enhanced
+  file_count: 2
+  directory_count: 0
+  primary_file_types:
+    .py: 1
+    .yaml: 1

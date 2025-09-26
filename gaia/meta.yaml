@@ -1,0 +1,14 @@
+schema_version: '2.0'
+directory_name: gaia
+description: The gaia directory is reserved for gaia functionality. It provides a
+  dedicated space for organizing related files and components.
+semantic_scope:
+- gaia
+files: []
+child_directories: []
+generation_context:
+  generator: ai_enhanced
+  file_count: 1
+  directory_count: 0
+  primary_file_types:
+    .yaml: 1
