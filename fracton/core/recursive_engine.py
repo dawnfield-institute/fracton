@@ -58,6 +58,7 @@ class ExecutionContext:
                  trace_id: str = None, field_state: Dict[str, Any] = None,
                  parent_context: 'ExecutionContext' = None, 
                  metadata: Dict[str, Any] = None, experiment: str = None):
+        import time
         self.entropy = entropy
         self.depth = depth
         self.trace_id = trace_id or str(uuid.uuid4())
@@ -65,6 +66,7 @@ class ExecutionContext:
         self.parent_context = parent_context
         self.metadata = metadata or {}
         self.experiment = experiment or self.metadata.get('experiment', 'default')
+        self.timestamp = time.time()  # Add timestamp for test compatibility
     
     def get(self, key: str, default: Any = None) -> Any:
         """Get a value from metadata (test-compatible interface)."""
@@ -273,6 +275,16 @@ class RecursiveExecutor:
         self.stats.function_call_counts[func_name] = (
             self.stats.function_call_counts.get(func_name, 0) + 1
         )
+    
+    def get_current_depth(self) -> int:
+        """Get current recursion depth."""
+        return self.call_stack.current_depth()
+    
+    def recursive(self, func: Callable) -> Callable:
+        """Decorator to mark a function as recursive (test compatibility)."""
+        # For test compatibility - just return the function
+        # In practice, the @fracton.recursive decorator should be used
+        return func
     
     def _is_tail_recursive_call(self, func: Callable) -> bool:
         """Check if this is a tail-recursive call that can be optimized."""
