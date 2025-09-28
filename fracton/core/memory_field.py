@@ -705,6 +705,15 @@ class MemoryField:
         self._garbage_collect()
         return initial_count - len(self._content)
     
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit."""
+        self.cleanup()
+        return False
+    
     def get_stats(self) -> Dict[str, Any]:
         """Get memory field statistics."""
         with self._lock:
@@ -988,7 +997,7 @@ class PhysicsMemoryField(MemoryField):
             xi_current = grad_norm / field_norm if field_norm > 1e-12 else 1.0571
             xi_deviation = abs(xi_current - self.xi_target)
             
-            # Conservation residual (energy conservation check)
+            # Conservation residual (energy conservation check)  
             initial_energy = 0.5 * np.linalg.norm(current_field)**2
             conservation_residual = abs(field_energy - initial_energy) / max(initial_energy, 1e-12)
             
