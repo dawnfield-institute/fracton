@@ -25,10 +25,42 @@ from fracton.core.bifractal_trace import BifractalTrace
 
 # Create a minimal Context class for testing
 class Context:
-    def __init__(self, entropy_level=0.5, depth=0, metadata=None):
-        self.entropy_level = entropy_level
+    def __init__(self, entropy_level=0.5, depth=0, metadata=None, entropy=None, experiment=None, timestamp=None):
+        # Support both entropy_level and entropy for backward compatibility
+        if entropy is not None:
+            self.entropy = entropy
+            self.entropy_level = entropy  # For compatibility
+        else:
+            self.entropy = entropy_level
+            self.entropy_level = entropy_level
+            
         self.depth = depth
         self.metadata = metadata or {}
+        self.experiment = experiment or "default"
+        self.timestamp = timestamp or time.time()
+        self.trace_id = f"trace_{id(self)}"
+    
+    def deeper(self, additional_depth):
+        """Create a deeper context"""
+        new_context = Context(
+            entropy=self.entropy,
+            depth=self.depth + additional_depth,
+            metadata=self.metadata.copy(),
+            experiment=self.experiment,
+            timestamp=self.timestamp
+        )
+        new_context.trace_id = f"trace_{id(new_context)}"
+        return new_context
+    
+    def with_entropy(self, new_entropy):
+        """Create context with different entropy"""
+        return Context(
+            entropy=new_entropy,
+            depth=self.depth,
+            metadata=self.metadata.copy(),
+            experiment=self.experiment,
+            timestamp=self.timestamp
+        )
 
 # Create fracton module-like namespace for decorators
 class FractonNamespace:

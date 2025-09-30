@@ -7,6 +7,7 @@ entropy levels, and field state for optimal recursive function selection.
 
 import time
 import math
+import uuid
 from typing import Any, Callable, Dict, List, Optional, Union, Tuple
 from dataclasses import dataclass, field
 from collections import defaultdict
@@ -325,12 +326,14 @@ class EntropyDispatcher:
     based on entropy levels, complexity, and dispatch conditions.
     """
     
-    def __init__(self, default_strategy: str = "entropy_weighted"):
+    def __init__(self, default_strategy: str = "entropy_weighted", track_statistics: bool = False):
         self.registry = DispatchRegistry()
         self.analyzer = ContextAnalyzer()
         self.entropy_matcher = EntropyMatcher()
         self.default_strategy = default_strategy
+        self.track_statistics = track_statistics
         self._dispatch_history: List[Dict] = []
+        self._statistics: Dict[str, Any] = {} if track_statistics else None
         self._lock = threading.Lock()
     
     def register_function(self, func: Callable, 
@@ -360,14 +363,14 @@ class EntropyDispatcher:
         candidates = self._get_candidates(context, available_functions)
         
         if not candidates:
-            return None
+            raise ValueError("No registered functions available")
         
         # Calculate fitness scores for all candidates
         scored_candidates = []
         for func in candidates:
             conditions = self.registry.get_function_conditions(func)
             if conditions:
-                fitness = self._calculate_fitness(context, conditions, analysis)
+                fitness = self._calculate_fitness(func, memory, context, conditions, analysis)
                 if fitness > 0:
                     scored_candidates.append(
                         FunctionCandidate(func, conditions, fitness)
@@ -377,7 +380,7 @@ class EntropyDispatcher:
             # Try fallback function if available
             if hasattr(self, '_fallback_function'):
                 return self._fallback_function(memory, context)
-            return None
+            raise ValueError("No suitable function found for the given context")
         
         # Sort by fitness (highest first)
         scored_candidates.sort(reverse=True)
@@ -388,6 +391,10 @@ class EntropyDispatcher:
         # Record dispatch decision
         dispatch_time = time.time() - start_time
         self._record_dispatch(context, best_candidate, analysis, dispatch_time)
+        
+        # Track statistics if enabled
+        if self.track_statistics:
+            self._update_statistics(best_candidate.func, context, dispatch_time)
         
         # Execute the selected function
         return best_candidate.func(memory, context)
@@ -402,10 +409,53 @@ class EntropyDispatcher:
         else:
             return self.registry.get_registered_functions()
     
-    def _calculate_fitness(self, context: ExecutionContext,
+    def _calculate_fitness(self, func: Callable, memory, context: ExecutionContext,
                           conditions: DispatchConditions,
                           analysis: ContextAnalysis) -> float:
         """Calculate overall fitness score for function-context match."""
+        # Get the custom conditions for this specific function
+        func_conditions = None
+        if hasattr(self, '_function_conditions'):
+            func_conditions = self._function_conditions.get(func, {})
+        
+        # Check depth conditions first (hard constraints)
+        if func_conditions:
+            # Check depth constraints
+            if 'depth_min' in func_conditions:
+                if context.depth < func_conditions['depth_min']:
+                    return 0.0
+                    
+            if 'depth_max' in func_conditions:
+                if context.depth >= func_conditions['depth_max']:
+                    return 0.0
+                    
+            # Check experiment pattern constraints  
+            if 'experiment_pattern' in func_conditions:
+                pattern = func_conditions['experiment_pattern']
+                if hasattr(context, 'experiment'):
+                    if pattern.endswith('*'):
+                        if not context.experiment.startswith(pattern[:-1]):
+                            return 0.0
+                    elif context.experiment != pattern:
+                        return 0.0
+                else:
+                    return 0.0
+        
+        # Check entropy constraints (hard constraint)
+        if not (conditions.min_entropy <= context.entropy <= conditions.max_entropy):
+            return 0.0
+        
+        # Check conditional functions if registered
+        if hasattr(self, '_conditional_functions') and func in self._conditional_functions:
+            condition_func = self._conditional_functions[func]
+            if condition_func:
+                try:
+                    if not condition_func(memory, context):
+                        return 0.0
+                except:
+                    # If condition evaluation fails, exclude this function
+                    return 0.0
+        
         score = 0.0
         
         # Entropy fitness (40% of total score)
@@ -426,9 +476,19 @@ class EntropyDispatcher:
         )
         score += metadata_fitness * 0.2
         
-        # Priority bonus (10% of total score)
-        priority_bonus = min(conditions.priority / 10.0, 0.1)
+        # Priority bonus (significant influence on selection)
+        priority_bonus = conditions.priority * 0.01  # Give priority real weight
         score += priority_bonus
+        
+        # Pattern match bonus for specificity
+        if func_conditions and 'experiment_pattern' in func_conditions:
+            pattern = func_conditions['experiment_pattern']
+            if hasattr(context, 'experiment'):
+                if pattern.endswith('*'):
+                    if context.experiment.startswith(pattern[:-1]):
+                        score += 0.2  # Bonus for pattern match
+                elif context.experiment == pattern:
+                    score += 0.2  # Bonus for exact match
         
         # Apply exclusion patterns
         if self._matches_exclusion_patterns(context, conditions.exclusion_patterns):
@@ -557,14 +617,30 @@ class EntropyDispatcher:
             return True  # Default to allowing dispatch
     
     def register(self, func: Callable, entropy_min: float = 0.0, 
-                entropy_max: float = 1.0, priority: int = 0, **kwargs) -> None:
+                 entropy_max: float = 1.0, priority: int = 0, **kwargs) -> str:
         """Register a function with entropy conditions (test-compatible interface)."""
         conditions = DispatchConditions(
             min_entropy=entropy_min,
             max_entropy=entropy_max,
             priority=priority
         )
+        
+        # Store additional kwargs for custom condition checking
+        if not hasattr(self, '_function_conditions'):
+            self._function_conditions = {}
+        self._function_conditions[func] = kwargs
+        
+        # Generate function ID and store mapping
+        if not hasattr(self, '_function_ids'):
+            self._function_ids = {}
+            self._id_to_function = {}
+        
+        function_id = str(uuid.uuid4())
+        self._function_ids[func] = function_id
+        self._id_to_function[function_id] = func
+        
         self.register_function(func, conditions)
+        return function_id
     
     def get_route_count(self) -> int:
         """Get the number of registered routes/functions."""
@@ -587,6 +663,78 @@ class EntropyDispatcher:
         if not hasattr(self, '_conditional_functions'):
             self._conditional_functions = {}
         self._conditional_functions[func] = condition
+    
+    def update_function(self, function_id: str, new_func: Callable) -> None:
+        """Update an existing registered function (test compatibility)."""
+        if not hasattr(self, '_id_to_function') or function_id not in self._id_to_function:
+            return  # Function ID not found
+        
+        old_func = self._id_to_function[function_id]
+        
+        # Get the conditions for the old function
+        old_conditions = self.registry.get_function_conditions(old_func)
+        old_custom_conditions = self._function_conditions.get(old_func, {})
+        
+        # Unregister the old function
+        self.registry._functions.pop(old_func, None)
+        self._function_conditions.pop(old_func, None)
+        
+        # Register the new function with the same conditions
+        self.registry.register_function(new_func, old_conditions)
+        self._function_conditions[new_func] = old_custom_conditions
+        
+        # Update the mappings
+        self._function_ids[new_func] = function_id
+        self._id_to_function[function_id] = new_func
+        self._function_ids.pop(old_func, None)
+    
+    def unregister(self, function_id: str) -> None:
+        """Remove a registered function by ID."""
+        if not hasattr(self, '_id_to_function') or function_id not in self._id_to_function:
+            return  # Function ID not found
+        
+        func = self._id_to_function[function_id]
+        
+        # Remove from all mappings
+        self.registry._functions.pop(func, None)
+        self._function_conditions.pop(func, None)
+        self._function_ids.pop(func, None)
+        self._id_to_function.pop(function_id, None)
+    
+    def get_statistics(self) -> Dict[str, Any]:
+        """Get dispatcher statistics (requires track_statistics=True)."""
+        if not self.track_statistics or not self._statistics:
+            return {}
+        return self._statistics.copy()
+    
+    def _update_statistics(self, func: Callable, context: ExecutionContext, dispatch_time: float):
+        """Update internal statistics tracking."""
+        if not self._statistics:
+            self._statistics = {
+                "total_dispatches": 0,
+                "function_usage": {},
+                "dispatch_times": [],
+                "entropy_distribution": {"low": 0, "high": 0}
+            }
+        
+        # Update counts
+        self._statistics["total_dispatches"] += 1
+        
+        # Track function usage
+        func_name = getattr(func, '__name__', str(func))
+        if func_name not in self._statistics["function_usage"]:
+            self._statistics["function_usage"][func_name] = 0
+        self._statistics["function_usage"][func_name] += 1
+        
+        # Track dispatch times
+        self._statistics["dispatch_times"].append(dispatch_time)
+        self._statistics["average_dispatch_time"] = sum(self._statistics["dispatch_times"]) / len(self._statistics["dispatch_times"])
+        
+        # Track entropy distribution
+        if context.entropy < 0.5:
+            self._statistics["entropy_distribution"]["low"] += 1
+        else:
+            self._statistics["entropy_distribution"]["high"] += 1
 
 
 # Global default dispatcher instance

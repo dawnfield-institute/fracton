@@ -280,6 +280,10 @@ class RecursiveExecutor:
         """Get current recursion depth."""
         return self.call_stack.current_depth()
     
+    def get_stack_size(self) -> int:
+        """Get current stack size (alias for get_current_depth for test compatibility)."""
+        return self.get_current_depth()
+    
     def recursive(self, func: Callable) -> Callable:
         """Decorator to mark a function as recursive (test compatibility)."""
         # For test compatibility - just return the function
