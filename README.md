@@ -4,6 +4,13 @@
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Development Status](https://img.shields.io/badge/status-alpha-orange.svg)](https://github.com/dawnfield-institute/fracton)
 
+---
+
+> **📢 Project Status Update (October 2025)**  
+> Due to increased work commitments over the next 2 months, all roadmaps are temporarily paused. The project is **not frozen**—work continues behind the scenes—but updates and documentation will be delayed. Expected to resume regular updates in December 2025. Thank you for your patience and continued interest.
+
+---
+
 ## Overview
 
 Fracton is a domain-specific computational modeling language designed for infodynamics research and recursive field-aware systems. It provides a unified substrate for modeling emergent intelligence, entropy dynamics, and bifractal computation patterns.
