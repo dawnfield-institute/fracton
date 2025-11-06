@@ -1,5 +1,117 @@
 # Fracton Development Roadmap
 
+**Updated**: November 4, 2025  
+**Status**: Reality Engine Integration Phase
+
+---
+
+## Phase 0: Reality Engine Integration (CURRENT - November 2025)
+
+**Goal**: Integrate Reality Engine v2 into Fracton as the `mobius` module
+
+### 0.1 Möbius Module Foundation (Week 1)
+- [ ] **Directory Structure**
+  - Create `fracton/mobius/` module
+  - Set up `__init__.py` with exports
+  - Add module to setup.py
+
+- [ ] **Möbius Substrate** (`substrate.py`)
+  - MobiusManifold class using Fracton's GPUMemoryField
+  - Anti-periodic boundary enforcement
+  - Three initialization modes (big_bang, random, structured)
+  - Topology validation and metrics
+  - Integration with existing memory_field.py
+
+- [ ] **Constants Module** (`constants.py`)
+  - Universal constants (Ξ = 1.0571, λ = 0.020, etc.)
+  - Validated from legacy experiments
+  - Physical parameter definitions
+
+### 0.2 Thermodynamic Coupling (Week 1)
+- [ ] **Thermodynamic Field** (`thermodynamics.py`)
+  - Temperature field management
+  - Landauer erasure cost calculation
+  - Heat diffusion (Fourier's law)
+  - Langevin thermal noise injection
+  - 2nd law monitoring
+  - Free energy computation
+
+- [ ] **Information-Energy Duality**
+  - Temperature-dependent field evolution
+  - Heat generation tracking
+  - Entropy production monitoring
+
+### 0.3 Core Dynamics Operators (Week 2)
+- [ ] **SEC Operator** (`sec_operator.py`)
+  - Port GeometricSEC from PACEngine
+  - Add thermodynamic coupling
+  - Energy functional minimization
+  - Heat generation from collapse
+  - Validation against PACEngine results
+
+- [ ] **Möbius Confluence** (`confluence.py`)
+  - Möbius inversion time stepping: P_{t+1}(u,v) = A_t(u+π, 1-v)
+  - Anti-periodic enforcement through time evolution
+  - Validation of confluence operation
+
+- [ ] **Time Emergence** (`time_emergence.py`)
+  - Disequilibrium pressure calculation
+  - Time rate from equilibrium-seeking
+  - Interaction density computation
+  - Time dilation in dense regions (gravity analog)
+  - Big Bang initialization support
+
+### 0.4 Unified Reality Engine (Week 2)
+- [ ] **Reality Engine Class** (`reality_engine.py`)
+  - Integrate all components into RecursiveEngine
+  - Use existing PAC, RBF, QBE from Fracton
+  - Full evolution loop
+  - State tracking and checkpointing
+  - GPU acceleration throughout
+
+- [ ] **Integration Testing**
+  - Test with Fracton's existing components
+  - Validate PAC precision (<1e-12)
+  - Check anti-periodicity enforcement (<0.1 error)
+  - Verify thermodynamic consistency
+
+### 0.5 Law Discovery Framework (Week 3)
+- [ ] **Pattern Detection** (`law_discovery.py`)
+  - Conservation law identification
+  - Force law extraction from field dynamics
+  - Symmetry detection
+  - Emergent constants measurement
+
+- [ ] **Validation Against Legacy**
+  - Reproduce cosmo.py results
+  - Reproduce brain.py results
+  - Reproduce vcpu.py results
+  - Verify Ξ = 1.0571 emergence
+  - Verify 0.020 Hz frequency
+
+### 0.6 Documentation and Examples (Week 4)
+- [ ] **Documentation**
+  - Complete API reference for mobius module
+  - Theory guide (Möbius topology, thermodynamics, time emergence)
+  - Integration guide with existing Fracton features
+  - Tutorial notebooks
+
+- [ ] **Examples**
+  - Big Bang evolution example
+  - Law discovery demonstration
+  - Time dilation visualization
+  - Fracton DSL integration example
+  - Comparison with Reality Engine v1
+
+**Deliverables**: 
+- Complete `fracton/mobius/` module integrated with Fracton infrastructure
+- Reality simulation working with GPU acceleration
+- Validated against legacy experiment results
+- Full documentation and examples
+- Fracton becomes "The Programming Language for Reality Simulation"
+
+---
+
 ## Phase 1: Core Foundation (Milestone 1.0)
 
 ### 1.1 Core Runtime Engine

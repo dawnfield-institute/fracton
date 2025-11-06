@@ -1,21 +1,37 @@
-# Fracton: Infodynamics Computational Modeling Language
+# Fracton: Infodynamics SDK & Programming Language
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![Development Status](https://img.shields.io/badge/status-alpha-orange.svg)](https://github.com/dawnfield-institute/fracton)
+[![Development Status](https://img.shields.io/badge/status-production-green.svg)](https://github.com/dawnfield-institute/fracton)
 
 ---
 
-> **📢 Project Status Update (October 2025)**  
-> Due to increased work commitments over the next 2 months, all roadmaps are temporarily paused. The project is **not frozen**—work continues behind the scenes—but updates and documentation will be delayed. Expected to resume regular updates in December 2025. Thank you for your patience and continued interest.
+> **📢 Repository Scope (November 2025)**  
+> **Fracton is the SDK/programming language** for infodynamics applications. It provides core primitives (RecursiveEngine, MemoryField, PAC regulation) and language constructs for building infodynamics systems.
+>
+> **Physics simulations** (Reality Engine, Big Bang, etc.) live in the separate **reality-engine** repository, which imports from Fracton as needed. This keeps responsibilities clean: Fracton = reusable SDK, reality-engine = physics implementation.
 
 ---
 
 ## Overview
 
-Fracton is a domain-specific computational modeling language designed for infodynamics research and recursive field-aware systems. It provides a unified substrate for modeling emergent intelligence, entropy dynamics, and bifractal computation patterns.
+Fracton is a domain-specific SDK and programming language for infodynamics research. It provides the foundational primitives for building systems that involve recursive execution, entropy-driven control flow, field operations, and PAC (Potential-Actualization-Conservation) regulation.
 
 **This is part of the [Dawn Field Theory](https://github.com/dawnfield-institute/dawn-field-theory) ecosystem, extracted as a standalone SDK for easier adoption and development.**
+
+### What Fracton Provides
+
+- **Core Primitives**: RecursiveEngine, MemoryField, PACRegulator
+- **Language Constructs**: @recursive, @entropy_gate, Context management
+- **Field Operations**: RBFEngine, QBERegulator, initializers
+- **Execution Framework**: Bifractal tracing, entropy dispatch
+- **GPU Support**: Built-in CUDA acceleration for field operations
+
+### What Fracton Does NOT Provide
+
+- Physics simulations (that's [reality-engine](https://github.com/dawnfield-institute/reality-engine))
+- Möbius topology implementations (that's reality-engine/substrate)
+- SEC/Confluence operators (that's reality-engine/conservation & dynamics)
 
 ## Installation
 
@@ -48,6 +64,39 @@ with fracton.memory_field() as field:
     context = fracton.Context(depth=10, entropy=0.8)
     result = fibonacci_field(field, context)
 ```
+
+## Reality Simulation with Fracton
+
+**NEW**: Fracton now includes the **Möbius module** for reality simulation, where physics emerges from first principles.
+
+```python
+from fracton.mobius import RealityEngine
+
+# Create universe simulator
+reality = RealityEngine(size=(256, 64), device='cuda')
+
+# Initialize from Big Bang (maximum disequilibrium)
+reality.initialize('big_bang')
+
+# Evolve and watch physics emerge
+for state in reality.evolve(steps=100000):
+    if state['step'] % 1000 == 0:
+        print(f"Time: {state['time']:.2f}, Temp: {state['temperature']:.4f}")
+        print(f"Disequilibrium: {state['disequilibrium']:.6f}")
+
+# Discover emergent laws
+laws = reality.discover_laws(states)
+print(f"Discovered: {laws}")
+```
+
+**Key Features**:
+- **Möbius Topology**: Anti-periodic boundaries create non-orientable substrate
+- **PAC Conservation**: Machine-precision (<1e-12) conservation enforcement
+- **Thermodynamic Coupling**: Information-energy duality (Landauer principle)
+- **Time Emergence**: Time flows from disequilibrium pressure, not imposed
+- **Law Discovery**: Automated detection of conservation laws, forces, symmetries
+
+See [Reality Engine Integration Guide](docs/REALITY_ENGINE_INTEGRATION.md) for details.
 
 ## Core Philosophy
 
