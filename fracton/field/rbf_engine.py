@@ -78,11 +78,19 @@ class RBFEngine:
         
         for axis in range(ndim):
             # Roll for finite differences (periodic boundaries)
-            laplacian += (
-                self.np.roll(field, 1, axis=axis) + 
-                self.np.roll(field, -1, axis=axis) - 
-                2 * field
-            )
+            # PyTorch uses 'dims' instead of 'axis'
+            if self.is_torch:
+                laplacian += (
+                    self.np.roll(field, 1, dims=axis) + 
+                    self.np.roll(field, -1, dims=axis) - 
+                    2 * field
+                )
+            else:
+                laplacian += (
+                    self.np.roll(field, 1, axis=axis) + 
+                    self.np.roll(field, -1, axis=axis) - 
+                    2 * field
+                )
         
         return laplacian
     
