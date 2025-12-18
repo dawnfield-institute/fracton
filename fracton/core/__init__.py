@@ -8,6 +8,8 @@ self-regulation ensuring f(parent) = Σf(children) conservation.
 
 Enhanced with physics capabilities for GAIA integration including PAC
 conservation, Klein-Gordon field evolution, and physics-aware recursion.
+
+v2.0: Added PACNode and PACSystem for PAC-Lazy substrate architecture.
 """
 
 from .recursive_engine import (
@@ -28,8 +30,10 @@ from .pac_regulation import (
     get_global_pac_regulator, validate_pac_conservation,
     enable_pac_self_regulation, get_system_pac_metrics
 )
+from .pac_node import PACNode, PACNodeFactory
+from .pac_system import PACSystem, TieredCache
 
-__version__ = "0.1.0"
+__version__ = "2.0.0"
 __all__ = [
     # Base recursive engine
     "RecursiveExecutor",
@@ -70,5 +74,11 @@ __all__ = [
     "get_global_pac_regulator",
     "validate_pac_conservation",
     "enable_pac_self_regulation",
-    "get_system_pac_metrics"
+    "get_system_pac_metrics",
+    
+    # PAC-Lazy substrate (v2.0)
+    "PACNode",
+    "PACNodeFactory",
+    "PACSystem",
+    "TieredCache"
 ]
