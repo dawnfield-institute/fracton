@@ -6,29 +6,38 @@ infodynamics research and recursive field-aware systems. It provides a
 unified substrate for modeling emergent intelligence, entropy dynamics, 
 and bifractal computation patterns.
 
+v2.0: PAC-Lazy Substrate Architecture
+- Delta-only storage with PACNode
+- Tiered caching with PACSystem
+- Physics constants from Dawn Field Theory
+- Spherical encoding and Klein-Gordon evolution
+
 Main Features:
 - Recursive execution as first-class primitive
 - Entropy-driven function dispatch
 - Bifractal tracing for operation analysis
 - Field-aware memory management
 - Tool expression framework
+- PAC-Lazy substrate for GAIA integration
 
 Example Usage:
     import fracton
+    from fracton.physics import PHI, XI
+    from fracton.core import PACSystem
+    from fracton.field import spherical_encode, evolve
     
-    @fracton.recursive
-    @fracton.entropy_gate(0.5)
-    def fibonacci_field(memory, context):
-        if context.depth <= 1:
-            return 1
-        
-        a = fracton.recurse(fibonacci_field, memory, context.deeper(1))
-        b = fracton.recurse(fibonacci_field, memory, context.deeper(2))
-        return a + b
+    # Create PAC-Lazy substrate
+    system = PACSystem(device='cuda')
     
-    with fracton.memory_field() as field:
-        context = fracton.Context(depth=10, entropy=0.8)
-        result = fibonacci_field(field, context)
+    # Inject a pattern
+    field = spherical_encode(token_id=42, dim=64, device='cuda')
+    node_id = system.inject(field)
+    
+    # Evolve the field
+    evolved = evolve(field, steps=5)
+    
+    # Find resonant patterns
+    similar = system.find_resonant(evolved, top_k=5)
 """
 
 # Core runtime components with native PAC self-regulation
@@ -45,7 +54,9 @@ from .core import (
     # Physics capabilities
     PhysicsRecursiveExecutor, get_physics_executor, recursive_physics,
     PhysicsEntropyDispatcher, get_physics_dispatcher,
-    PhysicsMemoryField, physics_memory_field
+    PhysicsMemoryField, physics_memory_field,
+    # PAC-Lazy substrate (v2.0)
+    PACNode, PACNodeFactory, PACSystem, TieredCache
 )
 
 # Language constructs
@@ -61,8 +72,16 @@ from .lang import (
     cognitive_pattern_extraction, superfluid_memory_dynamics
 )
 
+# Storage module (Kronos integration)
+from .storage import (
+    KronosBackend,
+    FDOSerializer,
+    TemporalIndex,
+    EpisodeTracker
+)
+
 # Version info
-__version__ = "0.1.0"
+__version__ = "2.1.0"
 __author__ = "Dawn Field Institute"
 __email__ = "info@dawnfield.org"
 
@@ -77,6 +96,12 @@ __all__ = [
     # Physics execution
     "PhysicsRecursiveExecutor",
     "get_physics_executor",
+    
+    # PAC-Lazy substrate (v2.0)
+    "PACNode",
+    "PACNodeFactory",
+    "PACSystem",
+    "TieredCache",
     
     # Decorators
     "recursive",
@@ -126,6 +151,12 @@ __all__ = [
     "validate_pac_conservation",
     "enable_pac_self_regulation",
     "get_system_pac_metrics",
+    
+    # Storage (Kronos)
+    "KronosBackend",
+    "FDOSerializer",
+    "TemporalIndex",
+    "EpisodeTracker",
     
     # Utilities
     "initialize_field",
