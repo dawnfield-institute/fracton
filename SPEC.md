@@ -9,6 +9,8 @@
 6. [Tool Expression](#tool-expression)
 7. [Error Handling](#error-handling)
 8. [Performance Considerations](#performance-considerations)
+9. [PAC Tree Monitoring](#pac-tree-monitoring)
+10. [Kronos Integration](#kronos-integration)
 
 ## Language Overview
 
@@ -368,6 +370,374 @@ def countdown(memory, context):
 - Bifractal traces grow with recursion depth
 - Use `fracton.prune_trace()` to remove unnecessary trace elements
 - Set trace depth limits for production systems
+
+---
+
+## 9. PAC Tree Monitoring
+
+PAC Tree (Pattern-Activated Context) Monitoring enables real-time observation of how patterns form, generalize, and potentially overfit during learning. This section specifies the monitoring subsystem for Fracton-based systems.
+
+### 9.1 Core Monitoring Types
+
+```python
+from dataclasses import dataclass
+from enum import Enum
+from typing import Dict, List, Set, Optional, Tuple
+import numpy as np
+
+class PatternType(Enum):
+    """Classification of pattern behavior."""
+    ABSTRACT = "abstract"        # High activation diversity, generalizable
+    SPECIFIC = "specific"        # Low diversity, potentially memorized
+    TRANSITIONAL = "transitional"  # In transition between states
+
+@dataclass
+class TreeMetrics:
+    """Structural metrics for PAC tree health."""
+    depth: int                    # Maximum tree depth
+    breadth: int                  # Number of leaf nodes
+    branching_factor: float       # Average children per non-leaf
+    compression_ratio: float      # Unique patterns / total tokens seen
+    reuse_ratio: float           # Pattern reuse frequency
+    byref_candidates: int        # Branches similar enough for byref optimization
+
+@dataclass
+class PatternProfile:
+    """Behavioral profile for a single pattern."""
+    pattern_id: str
+    activation_count: int         # How often activated
+    activation_contexts: Set[str]  # Unique contexts that activated it
+    activation_diversity: float    # len(contexts) / count
+    child_count: int              # Number of child patterns
+    depth: int                    # Position in tree
+    pattern_type: PatternType     # Classified type
+    entropy_signature: float      # Pattern's entropy contribution
+```
+
+### 9.2 Pattern Classification
+
+```python
+def classify_pattern(profile: PatternProfile, thresholds: dict) -> PatternType:
+    """
+    Classify a pattern based on its activation behavior.
+    
+    Classification rules:
+    - ABSTRACT: High diversity (>0.3), many children (>10), any depth
+    - SPECIFIC: Low diversity (<0.1), few children (<3), high activation
+    - TRANSITIONAL: Between thresholds, or recently changed classification
+    """
+    if (profile.activation_diversity > thresholds.get('abstract_diversity', 0.3) 
+        and profile.child_count > thresholds.get('abstract_children', 10)):
+        return PatternType.ABSTRACT
+    
+    if (profile.activation_diversity < thresholds.get('specific_diversity', 0.1)
+        and profile.child_count < thresholds.get('specific_children', 3)
+        and profile.activation_count > thresholds.get('specific_min_activations', 100)):
+        return PatternType.SPECIFIC
+    
+    return PatternType.TRANSITIONAL
+```
+
+### 9.3 Generalization Zone Detection
+
+Generalization zones are connected regions of ABSTRACT patterns. Healthy learning produces expanding generalization zones with SPECIFIC patterns at the leaves.
+
+```python
+@dataclass
+class GeneralizationZone:
+    """A connected region of abstract patterns."""
+    zone_id: str
+    root_pattern: str
+    abstract_patterns: Set[str]
+    boundary_patterns: Set[str]    # TRANSITIONAL at the edges
+    specific_leaves: Set[str]      # SPECIFIC patterns at leaves
+    zone_entropy: float            # Aggregate entropy of zone
+    zone_depth_range: Tuple[int, int]
+
+def detect_generalization_zones(
+    tree: 'PACTree',
+    min_zone_size: int = 5
+) -> List[GeneralizationZone]:
+    """
+    Find connected regions of abstract patterns.
+    
+    A healthy tree has:
+    - Large generalization zones near the root
+    - TRANSITIONAL patterns at zone boundaries
+    - SPECIFIC patterns only at leaves (fine-grained distinctions)
+    
+    Warning signs:
+    - SPECIFIC patterns at shallow depths (memorization)
+    - Small, disconnected generalization zones
+    - No TRANSITIONAL boundary layer
+    """
+    zones = []
+    visited = set()
+    
+    for pattern in tree.patterns:
+        if pattern.id in visited:
+            continue
+        if pattern.type != PatternType.ABSTRACT:
+            continue
+            
+        # BFS to find connected abstract region
+        zone_patterns = set()
+        boundary = set()
+        leaves = set()
+        queue = [pattern]
+        
+        while queue:
+            current = queue.pop(0)
+            if current.id in visited:
+                continue
+            visited.add(current.id)
+            
+            if current.type == PatternType.ABSTRACT:
+                zone_patterns.add(current.id)
+                for child in current.children:
+                    queue.append(child)
+            elif current.type == PatternType.TRANSITIONAL:
+                boundary.add(current.id)
+            elif current.type == PatternType.SPECIFIC:
+                leaves.add(current.id)
+        
+        if len(zone_patterns) >= min_zone_size:
+            zones.append(GeneralizationZone(
+                zone_id=f"zone_{len(zones)}",
+                root_pattern=pattern.id,
+                abstract_patterns=zone_patterns,
+                boundary_patterns=boundary,
+                specific_leaves=leaves,
+                zone_entropy=tree.compute_zone_entropy(zone_patterns),
+                zone_depth_range=(
+                    min(tree.get_depth(p) for p in zone_patterns),
+                    max(tree.get_depth(p) for p in zone_patterns)
+                )
+            ))
+    
+    return zones
+```
+
+### 9.4 Byref Optimization Detection
+
+When similar patterns emerge in different branches, they can be connected by reference (byref) for memory efficiency and improved generalization.
+
+```python
+@dataclass
+class BranchSimilarity:
+    """Detected similarity between PAC tree branches."""
+    branch_a: str
+    branch_b: str
+    similarity_score: float         # 0.0 to 1.0
+    shared_structure_depth: int     # How deep the similarity extends
+    estimated_memory_savings: int   # Bytes saved by byref
+    
+def detect_byref_candidates(
+    tree: 'PACTree',
+    similarity_threshold: float = 0.85
+) -> List[BranchSimilarity]:
+    """
+    Find branches that could benefit from byref optimization.
+    
+    Uses euclidean distance validation pattern:
+    - Branches with same structural depth
+    - Similar activation patterns
+    - Similar child distributions
+    
+    Returns candidates sorted by estimated memory savings.
+    """
+    candidates = []
+    branches = tree.get_all_branches()
+    
+    for i, branch_a in enumerate(branches):
+        for branch_b in branches[i+1:]:
+            similarity = compute_branch_similarity(branch_a, branch_b)
+            
+            if similarity.score >= similarity_threshold:
+                candidates.append(BranchSimilarity(
+                    branch_a=branch_a.id,
+                    branch_b=branch_b.id,
+                    similarity_score=similarity.score,
+                    shared_structure_depth=similarity.depth,
+                    estimated_memory_savings=estimate_byref_savings(
+                        branch_a, branch_b
+                    )
+                ))
+    
+    return sorted(candidates, key=lambda x: x.estimated_memory_savings, reverse=True)
+```
+
+### 9.5 SCBF Integration
+
+The Standard Consciousness Benchmark Framework provides metrics that integrate with PAC tree monitoring.
+
+```python
+@dataclass
+class SCBFMetrics:
+    """SCBF metrics relevant to PAC tree health."""
+    entropy_collapse_risk: float    # How close to collapse (0-1)
+    phase_alignment: float          # Alignment with PHI_XI
+    criticality: float              # Self-organized criticality measure
+    field_coherence: float          # Cross-pattern coherence
+
+class SCBFBridge:
+    """Bridge between SCBF metrics and PAC tree monitoring."""
+    
+    PHI_XI = 0.915965594177  # Golden ratio of criticality
+    
+    def __init__(self, entropy_detector, phase_tracker):
+        self.entropy_detector = entropy_detector
+        self.phase_tracker = phase_tracker
+    
+    def get_tree_health(self, tree: 'PACTree') -> SCBFMetrics:
+        """Compute SCBF metrics for current tree state."""
+        # Entropy collapse: too many SPECIFIC patterns
+        specific_ratio = tree.count_by_type(PatternType.SPECIFIC) / tree.total_patterns
+        collapse_risk = specific_ratio ** 2  # Quadratic penalty
+        
+        # Phase alignment: are transitions happening at right depths?
+        phase_alignment = self.phase_tracker.measure_alignment(tree)
+        
+        # Criticality: distance from PHI_XI
+        tree_criticality = tree.compute_criticality()
+        criticality = 1.0 - abs(tree_criticality - self.PHI_XI)
+        
+        # Field coherence: do patterns work together?
+        coherence = tree.compute_pattern_coherence()
+        
+        return SCBFMetrics(
+            entropy_collapse_risk=collapse_risk,
+            phase_alignment=phase_alignment,
+            criticality=criticality,
+            field_coherence=coherence
+        )
+```
+
+### 9.6 Training Interventions
+
+When monitoring detects problematic patterns, interventions can be applied to encourage generalization.
+
+```python
+class InterventionType(Enum):
+    """Types of training interventions."""
+    ADD_NOISE = "add_noise"           # Add Gaussian noise to embeddings
+    ADD_DROPOUT = "add_dropout"       # Temporary dropout increase
+    TOKEN_MASKING = "token_masking"   # Mask tokens to force context
+    POSITION_PERTURB = "position_perturb"  # Shuffle positions slightly
+    BRANCH_PRUNE = "branch_prune"     # Remove overly specific branches
+    BYREF_MERGE = "byref_merge"       # Connect similar branches
+
+@dataclass
+class Intervention:
+    """A specific intervention to apply."""
+    type: InterventionType
+    target_patterns: List[str]
+    strength: float  # 0.0 to 1.0
+    duration_steps: int
+
+class GeneralizationNurturingTrainer:
+    """Trainer that actively nurtures generalization."""
+    
+    def __init__(self, model, monitor, base_trainer):
+        self.model = model
+        self.monitor = monitor
+        self.base_trainer = base_trainer
+        self.intervention_history = []
+    
+    def training_step(self, batch):
+        # Get current tree state
+        tree_state = self.monitor.analyze()
+        
+        # Check for concerning patterns
+        if tree_state.entropy_collapse_risk > 0.3:
+            self.apply_intervention(Intervention(
+                type=InterventionType.ADD_NOISE,
+                target_patterns=tree_state.high_risk_patterns,
+                strength=0.1,
+                duration_steps=100
+            ))
+        
+        if tree_state.byref_candidates:
+            top_candidate = tree_state.byref_candidates[0]
+            if top_candidate.similarity_score > 0.95:
+                self.apply_intervention(Intervention(
+                    type=InterventionType.BYREF_MERGE,
+                    target_patterns=[top_candidate.branch_a, top_candidate.branch_b],
+                    strength=1.0,
+                    duration_steps=1  # Immediate
+                ))
+        
+        # Normal training step with active interventions
+        return self.base_trainer.step_with_interventions(
+            batch, self.active_interventions
+        )
+```
+
+### 9.7 Monitoring Visualization
+
+For interactive debugging, PAC tree state can be visualized:
+
+```python
+def visualize_tree_health(tree_state: TreeMetrics, zones: List[GeneralizationZone]) -> str:
+    """Generate ASCII visualization of tree health."""
+    lines = []
+    lines.append("═══ PAC Tree Health ═══")
+    lines.append(f"Depth: {tree_state.depth} | Breadth: {tree_state.breadth}")
+    lines.append(f"Branching Factor: {tree_state.branching_factor:.2f}")
+    lines.append(f"Compression: {tree_state.compression_ratio:.4f}")
+    lines.append(f"Byref Candidates: {tree_state.byref_candidates}")
+    lines.append("")
+    lines.append("Generalization Zones:")
+    for zone in zones:
+        health = "🟢" if len(zone.abstract_patterns) > 10 else "🟡" if len(zone.abstract_patterns) > 5 else "🔴"
+        lines.append(f"  {health} {zone.zone_id}: {len(zone.abstract_patterns)} abstract, "
+                    f"{len(zone.specific_leaves)} specific leaves")
+    return "\n".join(lines)
+```
+
+### 9.8 Module Structure
+
+The monitoring subsystem is organized as follows:
+
+```
+fracton/
+├── monitoring/
+│   ├── __init__.py              # Public API exports
+│   ├── pac_tree_monitor.py      # Core TreeMetrics, PatternProfile
+│   ├── generalization_monitor.py # Zone detection, pattern classification
+│   ├── interventions.py         # Training interventions
+│   ├── scbf_bridge.py          # SCBF metric integration
+│   └── visualization.py        # Tree health visualization
+```
+
+Usage:
+```python
+from fracton.monitoring import (
+    PACTreeMonitor,
+    GeneralizationZone,
+    detect_generalization_zones,
+    GeneralizationNurturingTrainer
+)
+
+# Attach monitor to model
+monitor = PACTreeMonitor(model.pac_tree)
+
+# Training with nurturing
+trainer = GeneralizationNurturingTrainer(model, monitor, base_trainer)
+for batch in dataloader:
+    loss = trainer.training_step(batch)
+    
+    # Periodic health check
+    if step % 100 == 0:
+        health = monitor.get_tree_health()
+        print(visualize_tree_health(health, monitor.zones))
+```
+
+---
+
+## 10. Kronos Integration
+
+Reserved for Kronos temporal coherence integration. See `cip-core/kronos/` for current Kronos specification.
 
 ---
 
