@@ -1,15 +1,32 @@
 # Fracton Documentation
 
-Welcome to the Fracton documentation! This directory contains comprehensive guides for using Fracton as a computational modeling language and reality simulation framework.
+**Version**: 2.0.0
+**Last Updated**: 2024-12-29
+
+Complete documentation for Fracton - the infodynamics SDK with real theoretical foundations from Dawn Field Theory.
 
 ---
 
 ## Quick Links
 
+- **New to Fracton?** Start with [Quick Reference](QUICK_REFERENCE.md)
+- **Need API details?** See [API Reference](API_REFERENCE.md)
+- **Want examples?** Check [Examples](../examples/)
+- **Deploying?** Read [Docker Guide](../DOCKER.md)
+
+---
+
+## NEW: Theoretical Foundations (v2.0.0)
+
+### KronosMemory with PAC/SEC/MED
+- **[API Reference](API_REFERENCE.md)** - Complete class documentation
+- **[Quick Reference](QUICK_REFERENCE.md)** - Cheat sheet and common patterns
+- **[KronosMemory Spec](../.spec/kronos-memory.spec.md)** - Full specification
+- **[Production Ready](../PRODUCTION_READY.md)** - Release checklist
+
 ### Getting Started
 - **[Main README](../README.md)** - Project overview, installation, quick start
 - **[Setup Guide](../SETUP.md)** - Installation and configuration
-- **[Möbius Quick Start](MOBIUS_QUICKSTART.md)** - Reality simulation quick start guide
 
 ### Core Documentation
 - **[Architecture](../ARCHITECTURE.md)** - System architecture and design
@@ -17,7 +34,7 @@ Welcome to the Fracton documentation! This directory contains comprehensive guid
 - **[Roadmap](../ROADMAP.md)** - Development roadmap and milestones
 - **[Status](../STATUS.md)** - Current implementation status
 
-### Reality Engine Integration (NEW!)
+### Reality Engine Integration
 - **[Integration Summary](REALITY_ENGINE_INTEGRATION_SUMMARY.md)** - Executive summary of Reality Engine integration
 - **[Full Integration Guide](REALITY_ENGINE_INTEGRATION.md)** - Complete technical specification
 - **[Möbius Quick Start](MOBIUS_QUICKSTART.md)** - Quick start for reality simulation
@@ -249,18 +266,77 @@ For Reality Engine integration specifically, see Phase 0 in the [Roadmap](../ROA
 
 ---
 
+## KronosMemory Quick Start
+
+### Basic Usage
+
+```python
+from fracton.storage import KronosMemory, NodeType
+
+# Initialize
+memory = KronosMemory(storage_path="./data", namespace="demo")
+await memory.connect()
+await memory.create_graph("notes")
+
+# Store
+note_id = await memory.store(
+    content="Fracton is production ready!",
+    graph="notes",
+    node_type=NodeType.CONCEPT
+)
+
+# Query
+results = await memory.query("production ready", graphs=["notes"])
+for r in results:
+    print(f"[{r.score:.3f}] {r.node.content}")
+
+# Health monitoring
+health = memory.get_foundation_health()
+print(f"Balance Ξ: {health['balance_operator']['latest']:.4f}")
+print(f"Duty cycle: {health['duty_cycle']['latest']:.3f}")
+```
+
+### Theoretical Foundations
+
+**PAC (Potential-Actualization Conservation)**:
+- Fibonacci recursion: Ψ(k) = Ψ(k+1) + Ψ(k+2)
+- Golden ratio scaling: φ = 1.618
+- Validated to 1e-10 precision
+
+**SEC (Symbolic Entropy Collapse)**:
+- 4:1 attraction/repulsion balance
+- Duty cycle: φ/(φ+1) = 0.618
+- Resonance ranking
+
+**MED (Macro Emergence Dynamics)**:
+- Universal bounds: depth ≤ 1, nodes ≤ 3
+- Quality scoring
+
+**E=mc² Distance Validation**:
+- Geometric conservation
+- Model-specific c² constants
+
+**Status**: ✅ 65/65 tests passing, <10% overhead
+
+---
+
 ## Document Updates
 
 | Document | Last Updated | Status |
 |----------|-------------|--------|
-| README.md | Nov 4, 2025 | ✅ Current |
-| ARCHITECTURE.md | Oct 2025 | ✅ Current |
-| SPEC.md | Oct 2025 | ✅ Current |
-| STATUS.md | Nov 4, 2025 | ✅ Current |
-| ROADMAP.md | Nov 4, 2025 | ✅ Current |
-| REALITY_ENGINE_INTEGRATION_SUMMARY.md | Nov 4, 2025 | ✅ New |
-| REALITY_ENGINE_INTEGRATION.md | Nov 4, 2025 | ✅ New |
-| MOBIUS_QUICKSTART.md | Nov 4, 2025 | ✅ New |
+| API_REFERENCE.md | Dec 29, 2024 | ✅ New (v2.0.0) |
+| QUICK_REFERENCE.md | Dec 29, 2024 | ✅ New (v2.0.0) |
+| README.md (this file) | Dec 29, 2024 | ✅ Updated |
+| ../PRODUCTION_READY.md | Dec 29, 2024 | ✅ New |
+| ../.spec/kronos-memory.spec.md | Dec 29, 2024 | ✅ Updated (v2.0.0) |
+| ../README.md | Dec 29, 2024 | ✅ Current |
+| ../ARCHITECTURE.md | Oct 2025 | ✅ Current |
+| ../SPEC.md | Oct 2025 | ✅ Current |
+| ../STATUS.md | Nov 4, 2025 | ✅ Current |
+| ../ROADMAP.md | Nov 4, 2025 | ✅ Current |
+| REALITY_ENGINE_INTEGRATION_SUMMARY.md | Nov 4, 2025 | ✅ Current |
+| REALITY_ENGINE_INTEGRATION.md | Nov 4, 2025 | ✅ Current |
+| MOBIUS_QUICKSTART.md | Nov 4, 2025 | ✅ Current |
 
 ---
 

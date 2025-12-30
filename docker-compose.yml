@@ -1,0 +1,214 @@
+version: '3.8'
+
+services:
+  # ========================================================================
+  # Fracton Application (CPU)
+  # ========================================================================
+  fracton-cpu:
+    build:
+      context: .
+      target: runtime-cpu
+    image: fracton:cpu
+    container_name: fracton-cpu
+    volumes:
+      - ./data:/app/data
+      - ./cache:/app/cache
+      - ./logs:/app/logs
+    environment:
+      - DEVICE=cpu
+      - FRACTON_DATA_DIR=/app/data
+      - FRACTON_BACKEND=chromadb
+      - CHROMADB_HOST=chromadb
+      - CHROMADB_PORT=8000
+    depends_on:
+      - chromadb
+    networks:
+      - fracton-network
+    restart: unless-stopped
+
+  # ========================================================================
+  # Fracton Application (GPU)
+  # ========================================================================
+  fracton-gpu:
+    build:
+      context: .
+      target: runtime-gpu
+    image: fracton:gpu
+    container_name: fracton-gpu
+    volumes:
+      - ./data:/app/data
+      - ./cache:/app/cache
+      - ./logs:/app/logs
+    environment:
+      - DEVICE=cuda
+      - FRACTON_DATA_DIR=/app/data
+      - FRACTON_BACKEND=chromadb
+      - CHROMADB_HOST=chromadb
+      - CHROMADB_PORT=8000
+    depends_on:
+      - chromadb
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - fracton-network
+    restart: unless-stopped
+    profiles:
+      - gpu
+
+  # ========================================================================
+  # Chatbot Example
+  # ========================================================================
+  chatbot:
+    build:
+      context: .
+      dockerfile: examples/chatbot/Dockerfile
+    image: fracton-chatbot:latest
+    container_name: fracton-chatbot
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+      - ./cache:/app/cache
+      - ./logs:/app/logs
+    environment:
+      - DEVICE=cpu
+      - FRACTON_DATA_DIR=/app/data
+      - FRACTON_BACKEND=chromadb
+      - CHROMADB_HOST=chromadb
+      - CHROMADB_PORT=8000
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    depends_on:
+      - chromadb
+    networks:
+      - fracton-network
+    restart: unless-stopped
+
+  # ========================================================================
+  # ChromaDB (Vector Database Backend)
+  # ========================================================================
+  chromadb:
+    image: ghcr.io/chroma-core/chroma:latest
+    container_name: fracton-chromadb
+    ports:
+      - "8000:8000"
+    volumes:
+      - chromadb-data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
+      - ANONYMIZED_TELEMETRY=FALSE
+    networks:
+      - fracton-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ========================================================================
+  # Neo4j (Graph Database Backend - Optional)
+  # ========================================================================
+  neo4j:
+    image: neo4j:5.14
+    container_name: fracton-neo4j
+    ports:
+      - "7474:7474"  # HTTP
+      - "7687:7687"  # Bolt
+    volumes:
+      - neo4j-data:/data
+      - neo4j-logs:/logs
+    environment:
+      - NEO4J_AUTH=neo4j/fracton123
+      - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+    networks:
+      - fracton-network
+    restart: unless-stopped
+    profiles:
+      - neo4j
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "fracton123", "RETURN 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ========================================================================
+  # Qdrant (Vector Database Backend - Optional)
+  # ========================================================================
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: fracton-qdrant
+    ports:
+      - "6333:6333"  # HTTP API
+      - "6334:6334"  # gRPC
+    volumes:
+      - qdrant-data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    networks:
+      - fracton-network
+    restart: unless-stopped
+    profiles:
+      - qdrant
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ========================================================================
+  # Development Environment
+  # ========================================================================
+  dev:
+    build:
+      context: .
+      target: development
+    image: fracton:dev
+    container_name: fracton-dev
+    volumes:
+      - .:/app
+      - ./data:/app/data
+      - ./cache:/app/cache
+      - ./logs:/app/logs
+    environment:
+      - DEVICE=cpu
+      - FRACTON_ENV=development
+      - FRACTON_BACKEND=chromadb
+      - CHROMADB_HOST=chromadb
+      - CHROMADB_PORT=8000
+    depends_on:
+      - chromadb
+    networks:
+      - fracton-network
+    profiles:
+      - dev
+    command: bash
+
+# ========================================================================
+# Networks
+# ========================================================================
+networks:
+  fracton-network:
+    driver: bridge
+    name: fracton-network
+
+# ========================================================================
+# Volumes
+# ========================================================================
+volumes:
+  chromadb-data:
+    name: fracton-chromadb-data
+  neo4j-data:
+    name: fracton-neo4j-data
+  neo4j-logs:
+    name: fracton-neo4j-logs
+  qdrant-data:
+    name: fracton-qdrant-data
