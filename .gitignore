@@ -194,3 +194,49 @@ local_config.py
 .cip/temp/
 .cip/cache/
 temp_*/
+
+# Claude local settings
+.claude/
+
+# Fracton-specific data and runtime files
+# ========================================
+
+# KronosMemory data directories (contain embeddings, graphs, user data)
+data/
+cache/
+logs/
+
+# Example data directories (may contain test conversations with API keys)
+examples/*/data/
+examples/chatbot/data/
+
+# Backend-specific database files
+*.db
+*.sqlite
+*.sqlite3
+chroma_data/
+neo4j_data/
+qdrant_data/
+
+# Embedding model caches
+.sentence_transformers/
+sentence-transformers-cache/
+
+# API keys and secrets (critical!)
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+secrets/
+credentials/
+
+# Test artifacts and temporary files
+test_*.py  # Temporary test scripts like test_memory_fix.py
+*.debug
+*.test
+temp_*.py
+
+# Docker volumes and runtime data
+docker-data/
+.docker/
