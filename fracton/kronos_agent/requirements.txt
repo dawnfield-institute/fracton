@@ -1,0 +1,21 @@
+# Kronos Agent Dependencies
+
+# Core
+anthropic>=0.40.0
+python-dotenv>=1.0.0
+
+# LangGraph (optional, for advanced workflows)
+# langgraph>=0.2.0
+# langchain-anthropic>=0.2.0
+
+# MCP Server
+mcp>=1.0.0
+
+# Kronos storage (from fracton)
+torch>=2.0.0
+sentence-transformers>=2.2.0
+chromadb>=0.4.0
+
+# Utilities
+aiohttp>=3.9.0
+pyyaml>=6.0
