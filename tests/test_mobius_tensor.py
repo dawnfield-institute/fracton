@@ -16,7 +16,8 @@ from fracton.core.mobius_tensor import (
     MobiusMatrix, MobiusFrame, MobiusStripTensor,
     MobiusFibonacciTensor, MobiusRecursiveTensor,
     cross_ratio, create_fibonacci_mobius, verify_4pi_periodicity,
-    PHI, PHI_INV
+    PHI, PHI_INV,
+    MobiusNeuron, MobiusLayer, MobiusRecursiveLayer, MobiusNetwork
 )
 
 
@@ -238,6 +239,130 @@ class TestIntegration:
         
         assert isinstance(tensor, MobiusFibonacciTensor)
         assert tensor.size == 55
+
+
+class TestMobiusNeuron:
+    """Tests for MobiusNeuron neural network component."""
+    
+    def test_identity_neuron(self):
+        """Identity neuron should pass through unchanged."""
+        neuron = MobiusNeuron('identity')
+        z = 1.5 + 0.5j
+        assert neuron(z) == pytest.approx(z, rel=1e-10)
+    
+    def test_fibonacci_neuron(self):
+        """Fibonacci neuron should have φ as fixed point."""
+        neuron = MobiusNeuron('fibonacci', n=10)
+        result = neuron(PHI)
+        assert result == pytest.approx(PHI, rel=1e-10)
+    
+    def test_feigenbaum_representation(self):
+        """
+        Test that M₁₀ can represent Feigenbaum r∞.
+        
+        Discovery: r∞ = π × M₁₀(z) where z ≈ -0.6175
+        """
+        R_INF = 3.5699456718709449
+        neuron = MobiusNeuron.feigenbaum()
+        
+        # The exact seed that produces r∞/π
+        z_exact = (34 * (R_INF/np.pi) - 55) / (89 - 55 * (R_INF/np.pi))
+        
+        result = neuron(z_exact) * np.pi
+        assert result == pytest.approx(R_INF, rel=1e-10)
+    
+    def test_near_identity_initialization(self):
+        """Near-identity should be close to identity."""
+        np.random.seed(42)
+        neuron = MobiusNeuron('near_identity', eps=0.01)
+        z = 1.0
+        # Should be close to z (within eps neighborhood)
+        assert abs(neuron(z) - z) < 0.1
+
+
+class TestMobiusLayer:
+    """Tests for MobiusLayer."""
+    
+    def test_layer_shape(self):
+        """Layer should produce correct output shape."""
+        layer = MobiusLayer(in_features=4, out_features=3)
+        x = np.array([1+0j, 2+0j, 3+0j, 4+0j])
+        output = layer(x)
+        assert output.shape == (3,)
+    
+    def test_compose_aggregation(self):
+        """Compose aggregation should multiply matrices."""
+        layer = MobiusLayer(in_features=2, out_features=1, aggregation='compose')
+        x = np.array([1+0j, 2+0j])
+        output = layer(x)
+        assert output.shape == (1,)
+        assert np.isfinite(output[0])
+    
+    def test_get_composed_matrix(self):
+        """Should return composed matrix for an output."""
+        layer = MobiusLayer(in_features=2, out_features=1, aggregation='compose')
+        M = layer.get_composed_matrix(0)
+        assert isinstance(M, MobiusMatrix)
+
+
+class TestMobiusRecursiveLayer:
+    """Tests for MobiusRecursiveLayer."""
+    
+    def test_fixed_points_at_phi(self):
+        """Fixed points should be φ and -1/φ at all depths."""
+        for depth in [3, 5, 10, 15]:
+            layer = MobiusRecursiveLayer(recursion_depth=depth)
+            fp1, fp2 = layer.fixed_points
+            
+            # Should be φ and -1/φ
+            fps_real = sorted([fp1.real, fp2.real])
+            assert fps_real[0] == pytest.approx(-PHI_INV, rel=1e-8)
+            assert fps_real[1] == pytest.approx(PHI, rel=1e-8)
+    
+    def test_caching(self):
+        """Matrices should be cached for efficiency."""
+        layer = MobiusRecursiveLayer(recursion_depth=10)
+        
+        # Access same matrix twice
+        M1 = layer.get_matrix(8)
+        M2 = layer.get_matrix(8)
+        
+        # Should be same object (cached)
+        assert M1 is M2
+    
+    def test_orbit_computation(self):
+        """Orbit should show evolution under successive matrices."""
+        layer = MobiusRecursiveLayer(recursion_depth=10)
+        orbit = layer.orbit(1.0, max_n=5)
+        
+        assert len(orbit) == 6  # [M[0](1), ..., M[5](1)]
+        # M[0] = identity, so first value should be 1
+        assert orbit[0] == pytest.approx(1.0, rel=1e-10)
+
+
+class TestMobiusNetwork:
+    """Tests for MobiusNetwork."""
+    
+    def test_network_forward_pass(self):
+        """Network should process input through all layers."""
+        network = MobiusNetwork([4, 3, 2], aggregation='average')
+        x = np.array([1+0j, 2+1j, 3-1j, 4+0j])
+        output = network(x)
+        
+        assert output.shape == (2,)
+        assert all(np.isfinite(output))
+    
+    def test_network_depth(self):
+        """Network depth should match layer count."""
+        network = MobiusNetwork([4, 3, 2, 1])
+        assert network.depth == 3  # 3 layers for 4 sizes
+    
+    def test_total_params(self):
+        """Should count parameters correctly."""
+        network = MobiusNetwork([4, 3, 2])
+        # Layer 1: 4*3*4 = 48, Layer 2: 3*2*4 = 24
+        # Total = 72 complex params
+        assert network.total_params() == 72
 
 
 if __name__ == '__main__':

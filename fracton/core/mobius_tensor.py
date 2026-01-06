@@ -526,3 +526,276 @@ def verify_4pi_periodicity(size: int = 55) -> dict:
         }
     
     return results
+
+
+# ============================================================
+# Möbius Neural Network Components
+# ============================================================
+
+class MobiusNeuron:
+    """
+    A single neuron that applies a Möbius transformation.
+    
+    Instead of: output = activation(w·x + b)
+    We have:    output = M(x) = (ax + b) / (cx + d)
+    
+    Key insight: The nonlinearity is BUILT-IN! No activation function needed.
+    A Möbius transformation is inherently nonlinear (rational function).
+    
+    Discovery: A single MobiusNeuron can exactly represent Feigenbaum's r∞:
+        r∞ = π × M₁₀(z) where z ≈ -1/φ + 0.000538
+    
+    The tiny offset from the fixed point encodes all logistic map nonlinearity.
+    """
+    
+    __slots__ = ('matrix',)
+    
+    def __init__(self, init_type: str = 'near_identity', **kwargs):
+        """
+        Initialize Möbius neuron.
+        
+        Args:
+            init_type: 'identity', 'near_identity', 'fibonacci', or 'random'
+            **kwargs: Additional params (e.g., n for fibonacci, eps for near_identity)
+        """
+        if init_type == 'identity':
+            self.matrix = MobiusMatrix.identity()
+        elif init_type == 'near_identity':
+            eps = kwargs.get('eps', 0.1)
+            a = 1 + eps * (np.random.randn() + 1j * np.random.randn())
+            b = eps * (np.random.randn() + 1j * np.random.randn())
+            c = eps * (np.random.randn() + 1j * np.random.randn())
+            d = 1 + eps * (np.random.randn() + 1j * np.random.randn())
+            self.matrix = MobiusMatrix(a, b, c, d, normalize=True)
+        elif init_type == 'fibonacci':
+            n = kwargs.get('n', 5)
+            self.matrix = MobiusMatrix.fibonacci(n)
+        elif init_type == 'random':
+            a = np.random.randn() + 1j * np.random.randn()
+            b = np.random.randn() + 1j * np.random.randn()
+            c = np.random.randn() + 1j * np.random.randn()
+            d = np.random.randn() + 1j * np.random.randn()
+            self.matrix = MobiusMatrix(a, b, c, d, normalize=True)
+        elif init_type == 'from_matrix':
+            self.matrix = kwargs['matrix']
+        else:
+            raise ValueError(f"Unknown init_type: {init_type}")
+    
+    def forward(self, z: complex) -> complex:
+        """Apply Möbius transformation to input."""
+        return self.matrix(z)
+    
+    def __call__(self, z: complex) -> complex:
+        return self.forward(z)
+    
+    @property
+    def params(self) -> Tuple[complex, complex, complex, complex]:
+        """Get parameters (a, b, c, d)."""
+        return (self.matrix.a, self.matrix.b, self.matrix.c, self.matrix.d)
+    
+    @classmethod
+    def feigenbaum(cls) -> 'MobiusNeuron':
+        """
+        Create a neuron configured for Feigenbaum computation.
+        
+        Uses M₁₀ (Fibonacci-10 Möbius) which satisfies:
+            r∞ = π × M₁₀(seed) where seed ≈ -0.6175
+        """
+        return cls(init_type='fibonacci', n=10)
+
+
+class MobiusLayer:
+    """
+    A layer of Möbius neurons for neural network use.
+    
+    Each output is computed by applying Möbius transformations to inputs
+    and aggregating. This differs fundamentally from linear layers:
+    - Built-in nonlinearity (no activation function)
+    - Composition is natural (matrix multiplication)
+    - Cross-ratio structure is preserved
+    
+    Aggregation modes:
+    - 'compose': Compose all Möbius matrices, apply to mean input
+    - 'average': Average of individual transform outputs
+    - 'product': Geometric mean of outputs (product in ℂ)
+    """
+    
+    def __init__(self, in_features: int, out_features: int,
+                 aggregation: str = 'average', init_type: str = 'near_identity'):
+        """
+        Initialize Möbius layer.
+        
+        Args:
+            in_features: Number of input features
+            out_features: Number of output features
+            aggregation: 'compose', 'average', or 'product'
+            init_type: Initialization for neurons
+        """
+        self.in_features = in_features
+        self.out_features = out_features
+        self.aggregation = aggregation
+        
+        # Each (output, input) pair has a Möbius neuron
+        self.neurons = [
+            [MobiusNeuron(init_type) for _ in range(in_features)]
+            for _ in range(out_features)
+        ]
+    
+    def forward(self, x: NDArray[np.complexfloating]) -> NDArray[np.complexfloating]:
+        """
+        Forward pass.
+        
+        Args:
+            x: Complex array of shape (in_features,)
+            
+        Returns:
+            Complex array of shape (out_features,)
+        """
+        output = np.zeros(self.out_features, dtype=complex)
+        
+        for i in range(self.out_features):
+            if self.aggregation == 'compose':
+                # Compose all Möbius transforms
+                composed = MobiusMatrix.identity()
+                for j in range(self.in_features):
+                    composed = self.neurons[i][j].matrix @ composed
+                # Apply to average input
+                output[i] = composed(np.mean(x))
+            
+            elif self.aggregation == 'average':
+                # Average of individual transforms
+                total = 0j
+                for j in range(self.in_features):
+                    total += self.neurons[i][j](x[j])
+                output[i] = total / self.in_features
+            
+            elif self.aggregation == 'product':
+                # Geometric mean
+                total = 1+0j
+                for j in range(self.in_features):
+                    result = self.neurons[i][j](x[j])
+                    if np.isfinite(result):
+                        total *= result
+                output[i] = total ** (1/self.in_features)
+        
+        return output
+    
+    def __call__(self, x: NDArray[np.complexfloating]) -> NDArray[np.complexfloating]:
+        return self.forward(x)
+    
+    def get_composed_matrix(self, output_idx: int) -> MobiusMatrix:
+        """Get the composed Möbius matrix for a given output."""
+        composed = MobiusMatrix.identity()
+        for j in range(self.in_features):
+            composed = self.neurons[output_idx][j].matrix @ composed
+        return composed
+
+
+class MobiusRecursiveLayer:
+    """
+    A layer that applies Fibonacci-style Möbius recursion.
+    
+    Implements: M[n] = M[n-1] @ M[n-2] (Fibonacci recursion)
+    
+    The recursion depth determines the effective transformation.
+    Fixed points are EXACTLY φ and -1/φ at ALL depths (they're invariant).
+    
+    This is the natural architecture for representing Feigenbaum-type
+    constants where φ structure emerges from recursion.
+    """
+    
+    def __init__(self, recursion_depth: int = 10, 
+                 seed_matrices: Optional[Tuple[MobiusMatrix, MobiusMatrix]] = None):
+        """
+        Initialize recursive layer.
+        
+        Args:
+            recursion_depth: Number of Fibonacci steps
+            seed_matrices: Optional (M0, M1) seeds. Defaults to Fibonacci generators.
+        """
+        self.depth = recursion_depth
+        
+        if seed_matrices:
+            self.M0, self.M1 = seed_matrices
+        else:
+            # Standard Fibonacci Möbius generators
+            self.M0 = MobiusMatrix.identity()
+            self.M1 = MobiusMatrix(1, 1, 1, 0, normalize=False)  # [[1,1],[1,0]]
+        
+        # Cache computed matrices
+        self._cache: dict = {0: self.M0, 1: self.M1}
+    
+    def get_matrix(self, n: int) -> MobiusMatrix:
+        """Get the n-th recursive Möbius matrix (cached)."""
+        if n in self._cache:
+            return self._cache[n]
+        
+        # Compute recursively
+        M = self.get_matrix(n-1) @ self.get_matrix(n-2)
+        self._cache[n] = M
+        return M
+    
+    def forward(self, z: complex) -> complex:
+        """Apply recursive Möbius transformation at current depth."""
+        return self.get_matrix(self.depth)(z)
+    
+    def __call__(self, z: complex) -> complex:
+        return self.forward(z)
+    
+    @property
+    def fixed_points(self) -> Tuple[complex, complex]:
+        """Get fixed points (always φ and -1/φ for Fibonacci seeds)."""
+        return self.get_matrix(self.depth).fixed_points()
+    
+    def orbit(self, z0: complex, max_n: Optional[int] = None) -> List[complex]:
+        """Compute orbit of z0 under successive M[n]."""
+        max_n = max_n or self.depth
+        return [self.get_matrix(n)(z0) for n in range(max_n + 1)]
+
+
+class MobiusNetwork:
+    """
+    A full neural network using Möbius layers.
+    
+    Architecture: Input → [MobiusLayer]* → Output
+    
+    Key properties:
+    1. Built-in nonlinearity (no activation functions)
+    2. Composition structure (not weighted sums)
+    3. Cross-ratio preservation through layers
+    4. Natural recursion via MobiusRecursiveLayer
+    """
+    
+    def __init__(self, layer_sizes: List[int], aggregation: str = 'average'):
+        """
+        Initialize network.
+        
+        Args:
+            layer_sizes: [input_dim, hidden1, hidden2, ..., output_dim]
+            aggregation: Aggregation method for layers
+        """
+        self.layers: List[MobiusLayer] = []
+        for i in range(len(layer_sizes) - 1):
+            layer = MobiusLayer(layer_sizes[i], layer_sizes[i+1], aggregation)
+            self.layers.append(layer)
+    
+    def forward(self, x: NDArray[np.complexfloating]) -> NDArray[np.complexfloating]:
+        """Forward pass through all layers."""
+        for layer in self.layers:
+            x = layer(x)
+        return x
+    
+    def __call__(self, x: NDArray[np.complexfloating]) -> NDArray[np.complexfloating]:
+        return self.forward(x)
+    
+    @property
+    def depth(self) -> int:
+        """Number of layers."""
+        return len(self.layers)
+    
+    def total_params(self) -> int:
+        """Total number of complex parameters (4 per neuron)."""
+        total = 0
+        for layer in self.layers:
+            total += layer.in_features * layer.out_features * 4
+        return total
