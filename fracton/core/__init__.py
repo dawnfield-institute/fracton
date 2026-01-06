@@ -32,8 +32,14 @@ from .pac_regulation import (
 )
 from .pac_node import PACNode, PACNodeFactory
 from .pac_system import PACSystem, TieredCache
+from .mobius_tensor import (
+    MobiusMatrix, MobiusFrame, MobiusStripTensor,
+    MobiusFibonacciTensor, MobiusRecursiveTensor,
+    cross_ratio, create_fibonacci_mobius, verify_4pi_periodicity,
+    PHI, PHI_INV
+)
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 __all__ = [
     # Base recursive engine
     "RecursiveExecutor",
@@ -80,5 +86,17 @@ __all__ = [
     "PACNode",
     "PACNodeFactory",
     "PACSystem",
-    "TieredCache"
+    "TieredCache",
+    
+    # Möbius tensor architecture (v2.1)
+    "MobiusMatrix",
+    "MobiusFrame",
+    "MobiusStripTensor",
+    "MobiusFibonacciTensor",
+    "MobiusRecursiveTensor",
+    "cross_ratio",
+    "create_fibonacci_mobius",
+    "verify_4pi_periodicity",
+    "PHI",
+    "PHI_INV"
 ]
