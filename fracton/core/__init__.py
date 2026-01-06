@@ -36,10 +36,12 @@ from .mobius_tensor import (
     MobiusMatrix, MobiusFrame, MobiusStripTensor,
     MobiusFibonacciTensor, MobiusRecursiveTensor,
     cross_ratio, create_fibonacci_mobius, verify_4pi_periodicity,
-    PHI, PHI_INV
+    PHI, PHI_INV,
+    # Neural network components (v2.2)
+    MobiusNeuron, MobiusLayer, MobiusRecursiveLayer, MobiusNetwork
 )
 
-__version__ = "2.1.0"
+__version__ = "2.2.0"
 __all__ = [
     # Base recursive engine
     "RecursiveExecutor",
@@ -98,5 +100,11 @@ __all__ = [
     "create_fibonacci_mobius",
     "verify_4pi_periodicity",
     "PHI",
-    "PHI_INV"
+    "PHI_INV",
+    
+    # Möbius neural network (v2.2)
+    "MobiusNeuron",
+    "MobiusLayer",
+    "MobiusRecursiveLayer",
+    "MobiusNetwork"
 ]
