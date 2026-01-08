@@ -40,8 +40,18 @@ from .mobius_tensor import (
     # Neural network components (v2.2)
     MobiusNeuron, MobiusLayer, MobiusRecursiveLayer, MobiusNetwork
 )
+from .feigenbaum_mobius import (
+    # Constants (v2.3)
+    DELTA_FEIGENBAUM, ALPHA_FEIGENBAUM, UNIVERSAL_DELTA_Z,
+    R_INF_LOGISTIC, R_INF_SINE,
+    # Classes
+    FibonacciMobius, M10, F as fibonacci,
+    # Functions
+    compute_delta_self_consistent, compute_universal_delta_z,
+    prove_eigenvalue_identity, get_constants_summary,
+)
 
-__version__ = "2.2.0"
+__version__ = "2.3.0"
 __all__ = [
     # Base recursive engine
     "RecursiveExecutor",
@@ -106,5 +116,19 @@ __all__ = [
     "MobiusNeuron",
     "MobiusLayer",
     "MobiusRecursiveLayer",
-    "MobiusNetwork"
+    "MobiusNetwork",
+    
+    # Feigenbaum-Möbius structure (v2.3)
+    "DELTA_FEIGENBAUM",
+    "ALPHA_FEIGENBAUM",
+    "UNIVERSAL_DELTA_Z",
+    "R_INF_LOGISTIC",
+    "R_INF_SINE",
+    "FibonacciMobius",
+    "M10",
+    "fibonacci",
+    "compute_delta_self_consistent",
+    "compute_universal_delta_z",
+    "prove_eigenvalue_identity",
+    "get_constants_summary",
 ]
