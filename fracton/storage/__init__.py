@@ -79,17 +79,21 @@ Example (Low-level PAC Storage):
     substrate.restore_state(episode_id)
 """
 
-from .kronos_backend import KronosBackend
+# v2 Core Components
+from .node import KronosNode, DocumentReference, CrystallizationEvent
+from .edge import KronosEdge, RelationType as EdgeRelationType
+from .confidence import GeometricConfidence
+from .graph import KronosGraph
+from .response_generator import KronosResponseGenerator, ResponseContext
+
+# v1 Legacy (moved to legacy/v1_rag/)
+# from .kronos_backend import KronosBackend
+# from .kronos_memory import KronosMemory, PACMemoryNode, NodeType, RelationType, ResonanceResult
+
+# Support components
 from .fdo_serializer import FDOSerializer
 from .temporal_index import TemporalIndex
 from .episode_tracker import EpisodeTracker
-from .kronos_memory import (
-    KronosMemory,
-    PACMemoryNode,
-    NodeType,
-    RelationType,
-    ResonanceResult
-)
 from .backends import (
     GraphBackend,
     VectorBackend,
@@ -99,15 +103,26 @@ from .backend_factory import BackendFactory, create_backends_from_env
 from .embeddings import EmbeddingService, create_embedding_service, EMBEDDING_MODELS
 
 __all__ = [
-    # Unified Semantic Memory (PAC+SEC+PAS)
-    'KronosMemory',
-    'PACMemoryNode',
-    'NodeType',
-    'RelationType',
-    'ResonanceResult',
+    # v2 Core Components
+    'KronosNode',
+    'DocumentReference',
+    'CrystallizationEvent',
+    'KronosEdge',
+    'EdgeRelationType',
+    'GeometricConfidence',
+    'KronosGraph',
+    'KronosResponseGenerator',
+    'ResponseContext',
 
-    # Low-level Storage
-    'KronosBackend',
+    # v1 Legacy (archived in legacy/v1_rag/)
+    # 'KronosMemory',
+    # 'PACMemoryNode',
+    # 'NodeType',
+    # 'RelationType',
+    # 'ResonanceResult',
+    # 'KronosBackend',
+
+    # Support Components
     'FDOSerializer',
     'TemporalIndex',
     'EpisodeTracker',
