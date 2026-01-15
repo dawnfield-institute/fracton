@@ -72,9 +72,14 @@ from .lang import (
     cognitive_pattern_extraction, superfluid_memory_dynamics
 )
 
-# Storage module (Kronos integration)
+# Storage module (Kronos v2)
 from .storage import (
-    KronosBackend,
+    KronosNode,
+    KronosEdge,
+    KronosGraph,
+    GeometricConfidence,
+    DocumentReference,
+    CrystallizationEvent,
     FDOSerializer,
     TemporalIndex,
     EpisodeTracker
