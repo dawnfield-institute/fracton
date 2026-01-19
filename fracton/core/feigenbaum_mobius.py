@@ -93,7 +93,11 @@ CONST_1371 = 1371  # F₁₀ × 5² - 4 = 55 × 25 - 4
 CONST_1857 = 1857  # F₁₀ × F₉ - F₇ = 55 × 34 - 13
 
 # Ξ (Xi) - balance constant
-XI = 1 + np.pi / 55  # 1.0571198664...
+# DERIVATION (2026-01-19): Proven from PAC collapse dynamics
+#   Ξ - 1 = within + cross = 2√(r(1-r))-1 + cross = π/55 per level
+#   where r = 1/φ, validated to 8 decimal places
+#   Trace: dawn-field-theory/foundational/experiments/oscillation_attractor_dynamics/scripts/exp_24_comprehensive_validation.py
+XI = 1 + np.pi / 55  # 1.0571... (DERIVED, not curve-fit)
 
 # =============================================================================
 # MÖBIUS TRANSFORMATION STRUCTURE

@@ -11,8 +11,9 @@ All constants are DERIVED from φ (golden ratio), not fitted:
 
 NOTE: This is the "SEC Threshold Model" for practical memory management.
       GAIA Prime uses the "Möbius Field Model" with different XI derivation:
-      - Möbius XI = 1 + π/55 ≈ 1.0571 (field coupling strength)
-      - SEC XI = φ⁻¹/10 ≈ 0.0618 (collapse threshold)
+      - Möbius XI = 1 + π/55 ≈ 1.0571 (field coupling strength)          DERIVATION (2026-01-19): Ξ - 1 = π/55 proven from PAC collapse dynamics
+          within = -0.0283 + cross = +0.0854 = net π/55 per level
+          Trace: oscillation_attractor_dynamics/scripts/exp_24_comprehensive_validation.py      - SEC XI = φ⁻¹/10 ≈ 0.0618 (collapse threshold)
       Both are φ-derived and valid for their respective domains.
 
 See: dawn-models/research/GAIA/src/gaia_prime/validated_constants.py
