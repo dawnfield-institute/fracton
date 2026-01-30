@@ -1,6 +1,6 @@
 # ShadowPuppet
 
-**Architecture-as-Code Evolution Framework**
+**Architecture-as-Code Evolution Framework** (v0.2.0)
 
 A model-agnostic framework for evolving software through protocol-driven generation.
 
@@ -11,6 +11,15 @@ A model-agnostic framework for evolving software through protocol-driven generat
 - **Shadow** is the generated code (the projection that runs)
 - **Evolution** selects better puppets (architecture improvement)
 
+## What's New in v0.2
+
+- **Rich Type Signatures** - `TypeAnnotation` for stronger method contracts
+- **Genetic Crossover** - Combine methods from high-fitness parents
+- **PAC Invariant Validation** - Hard enforcement of conservation laws
+- **Targeted Refinement** - Fix specific issues in borderline candidates
+- **LLM Semantic Review** - Optional AI-based semantic validation
+- **Tournament Selection** - Better parent selection strategy
+
 ## Quick Start
 
 ```python
@@ -18,33 +27,59 @@ from fracton.tools.shadowpuppet import (
     SoftwareEvolution,
     ProtocolSpec,
     GrowthGap,
-    MockGenerator
+    MockGenerator,
+    TypeAnnotation
 )
 
-# Define architecture as Python protocols
+# Define architecture with rich types
 api_protocol = ProtocolSpec(
     name="APIRouter",
     methods=["get", "post", "put", "delete"],
+    method_signatures=[
+        TypeAnnotation("get", {"path": "str"}, "Response"),
+        TypeAnnotation("post", {"path": "str", "body": "Dict"}, "Response", raises=["ValidationError"]),
+    ],
     docstring="REST API router with CRUD operations",
-    pac_invariants=["All routes return JSON", "Errors use standard HTTP codes"]
+    pac_invariants=["All routes return JSON", "Errors use standard HTTP codes"],
+    attributes=["routes: Dict[str, Callable]", "middleware: List[Callable]"]
 )
 
-# Create evolution with your generator
+# Create evolution with crossover and refinement
+from fracton.tools.shadowpuppet.evolution import EvolutionConfig
+
 evolution = SoftwareEvolution(
-    generator=MockGenerator(),  # No AI required
-    coherence_threshold=0.65
+    generator=MockGenerator(),
+    config=EvolutionConfig(
+        coherence_threshold=0.65,
+        enable_crossover=True,
+        enable_refinement=True
+    )
 )
 
 # Evolve!
 results = evolution.grow([GrowthGap(protocol=api_protocol)])
 
 # Get generated code
-for organism in results.population:
-    print(f"{organism.id}: {organism.fitness:.3f}")
-    print(organism.code)
+for component in evolution.components:
+    print(f"{component.id}: {component.coherence_score:.3f}")
 ```
 
 ## Key Concepts
+
+### TypeAnnotation (New in v0.2)
+
+Rich type signatures for methods:
+
+```python
+TypeAnnotation(
+    name="get_user",
+    params={"user_id": "str", "include_deleted": "bool = False"},
+    returns="Optional[User]",
+    raises=["NotFoundError", "ValidationError"],
+    async_method=False
+)
+# Generates: def get_user(self, user_id: str, include_deleted: bool = False) -> Optional[User]
+```
 
 ### ProtocolSpec
 
@@ -54,12 +89,13 @@ Defines a component's structure:
 ProtocolSpec(
     name="UserService",
     methods=["create_user", "get_user", "update_user", "delete_user"],
-    attributes=["users", "email_index"],
+    method_signatures=[...],  # Optional rich types
+    attributes=["users: Dict[str, User]", "email_index: Dict[str, str]"],
     docstring="User management with validation",
     pac_invariants=[
         "User IDs are unique and immutable",
         "Emails are validated before storage",
-        "Passwords are never stored in plaintext"
+        "Passwords are never stored in plaintext"  # Will be enforced!
     ]
 )
 ```
@@ -71,7 +107,7 @@ Identifies what needs to be generated:
 ```python
 GrowthGap(
     protocol=user_protocol,
-    parent_code=existing_code,  # Optional: context for AI
+    parent_components=[existing_component],  # Optional: context for AI
     priority=1.0
 )
 ```
@@ -96,6 +132,58 @@ Three-dimensional fitness scoring:
 - **Energetic** (0-1): Efficiency, resource usage
 
 Combined: `fitness = (structural * semantic * energetic) ^ (1/3)`
+
+**PAC Invariant Validation** (New in v0.2):
+```python
+evaluator = CoherenceEvaluator(
+    enforce_invariants=True,  # Hard-fail on violations
+    llm_reviewer=ClaudeGenerator()  # Optional semantic review
+)
+```
+
+### EvolutionConfig
+
+Configure the evolution process:
+
+```python
+EvolutionConfig(
+    coherence_threshold=0.70,      # Minimum fitness to survive
+    reproduction_threshold=0.80,   # Minimum to become parent
+    max_population=50,
+    candidates_per_gap=3,
+    mutation_rate=0.2,
+    max_generations=10,
+    # New in v0.2
+    enable_crossover=True,         # Genetic crossover
+    crossover_rate=0.3,            # Probability of crossover
+    enable_refinement=True,        # Targeted repair
+    refinement_threshold=0.5,      # Score to trigger refinement
+    max_refinement_attempts=2
+)
+```
+
+### Crossover (New in v0.2)
+
+When enabled, evolution can combine methods from two parents:
+
+```python
+# Automatic during evolution
+evolution = SoftwareEvolution(
+    config=EvolutionConfig(enable_crossover=True)
+)
+
+# Or manually
+child_code = evolution.crossover(parent_a, parent_b, protocol)
+```
+
+### Refinement (New in v0.2)
+
+Borderline candidates get targeted repair:
+
+```python
+# Automatic during evolution for scores < refinement_threshold
+# Or manually
+refined = evolution.refine(component, context, ["Fix: passwords not hashed"])
 
 ## Examples
 

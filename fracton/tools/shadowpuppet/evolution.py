@@ -6,13 +6,20 @@ The main evolution loop that:
 - Evaluates fitness (coherence + tests)
 - Selects survivors based on threshold
 - Tracks genealogy across generations
+
+Improvements over v1:
+- Crossover/recombination between high-fitness parents
+- Targeted refinement loop for borderline candidates
+- Better parent selection with tournament
 """
 
 import json
 import time
+import ast
+import re
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, List, Optional, Any, Type
+from typing import Dict, List, Optional, Any, Type, Tuple
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -34,6 +41,12 @@ class EvolutionConfig:
     max_generations: int = 10
     save_checkpoints: bool = True
     output_dir: Optional[Path] = None
+    # New options
+    enable_crossover: bool = True
+    crossover_rate: float = 0.3  # Probability of crossover vs mutation
+    enable_refinement: bool = True
+    refinement_threshold: float = 0.5  # Score below which to attempt refinement
+    max_refinement_attempts: int = 2
 
 
 @dataclass
@@ -187,34 +200,57 @@ class SoftwareEvolution:
                 # Find best parent for template
                 parent = self._select_parent(gap)
                 
+                # Decide: crossover or mutation?
+                import random
+                use_crossover = (
+                    self.config.enable_crossover and 
+                    len(self.components) >= 2 and
+                    random.random() < self.config.crossover_rate
+                )
+                
                 # Generate candidates
-                print(f"  [>] Generating {self.config.candidates_per_gap} candidates for: {gap.protocol.name}")
+                if use_crossover:
+                    print(f"  [X] Crossover for: {gap.protocol.name}")
+                else:
+                    print(f"  [>] Generating {self.config.candidates_per_gap} candidates for: {gap.protocol.name}")
                 
                 candidates = []
                 for idx in range(self.config.candidates_per_gap):
                     start_time = time.time()
                     
-                    # Vary mutation rate for diversity
-                    mutation_variation = self.config.mutation_rate * (
-                        1.0 + 0.3 * (idx / max(1, self.config.candidates_per_gap - 1))
-                    )
+                    if use_crossover and idx == 0:
+                        # First candidate via crossover
+                        parent_a, parent_b = self._select_parents_for_crossover(gap)
+                        if parent_a and parent_b:
+                            code = self.crossover(parent_a, parent_b, gap.protocol)
+                            parent = parent_a  # Track lineage from first parent
+                        else:
+                            use_crossover = False
+                            # Fall through to normal generation
                     
-                    # Build generation context
-                    from .generators.base import GenerationContext
-                    gen_context = GenerationContext(
-                        protocol=gap.protocol,
-                        parent=parent,
-                        siblings=[c for c in self.components if c.protocol_name != gap.protocol.name][:2],
-                        mutation_rate=mutation_variation,
-                        pac_invariants=self.env.pac_invariants + gap.protocol.pac_invariants
-                    )
-                    
-                    # Generate code
-                    try:
-                        code = self.generator.generate(gen_context)
-                    except Exception as e:
-                        print(f"      [!] Generation failed: {e}")
-                        continue
+                    if not use_crossover or idx > 0:
+                        # Normal mutation-based generation
+                        # Vary mutation rate for diversity
+                        mutation_variation = self.config.mutation_rate * (
+                            1.0 + 0.3 * (idx / max(1, self.config.candidates_per_gap - 1))
+                        )
+                        
+                        # Build generation context
+                        from .generators.base import GenerationContext
+                        gen_context = GenerationContext(
+                            protocol=gap.protocol,
+                            parent=parent,
+                            siblings=[c for c in self.components if c.protocol_name != gap.protocol.name][:2],
+                            mutation_rate=mutation_variation,
+                            pac_invariants=self.env.pac_invariants + gap.protocol.pac_invariants
+                        )
+                        
+                        # Generate code
+                        try:
+                            code = self.generator.generate(gen_context)
+                        except Exception as e:
+                            print(f"      [!] Generation failed: {e}")
+                            continue
                     
                     generation_time = time.time() - start_time
                     
@@ -226,7 +262,7 @@ class SoftwareEvolution:
                         parent_id=parent.id if parent else None,
                         generation=gen,
                         derivation_path=(parent.derivation_path + [gap.protocol.name]) if parent else [gap.protocol.name],
-                        generator_used=self.generator.name,
+                        generator_used=self.generator.name + ("+crossover" if use_crossover and idx == 0 else ""),
                         generation_time=generation_time
                     )
                     self.next_id += 1
@@ -242,6 +278,26 @@ class SoftwareEvolution:
                     }
                     
                     fitness = self.evaluator.evaluate(component, eval_context)
+                    
+                    # REFINEMENT: If score is borderline, try to fix
+                    if (self.config.enable_refinement and 
+                        fitness < self.config.refinement_threshold and
+                        fitness > 0.2):  # Don't refine hopeless cases
+                        
+                        violations = eval_context.get('invariant_violations', {}).get(component.id, [])
+                        if not violations:
+                            violations = [f"Low fitness: {fitness:.3f}"]
+                        
+                        for attempt in range(self.config.max_refinement_attempts):
+                            refined_code = self.refine(component, eval_context, violations)
+                            if refined_code:
+                                component.code = refined_code
+                                new_fitness = self.evaluator.evaluate(component, eval_context)
+                                if new_fitness > fitness:
+                                    print(f"      [R] Refined: {fitness:.3f} -> {new_fitness:.3f}")
+                                    fitness = new_fitness
+                                    break
+                    
                     candidates.append(component)
                     
                     print(f"      Candidate {idx+1}: fitness={fitness:.3f} "
@@ -302,21 +358,186 @@ class SoftwareEvolution:
         return self._compile_results()
     
     def _select_parent(self, gap: GrowthGap) -> Optional[ComponentOrganism]:
-        """Select best component as template."""
+        """Select best component as template using tournament selection."""
         if not self.components:
             return None
         
         # Prefer same protocol family
         same_protocol = [c for c in self.components if c.protocol_name == gap.protocol.name]
         if same_protocol:
-            parent = max(same_protocol, key=lambda c: c.coherence_score)
+            parent = self._tournament_select(same_protocol)
             parent.reuse_count += 1
             return parent
         
-        # Otherwise highest coherence
-        parent = max(self.components, key=lambda c: c.coherence_score)
+        # Otherwise tournament from all
+        parent = self._tournament_select(self.components)
         parent.reuse_count += 1
         return parent
+    
+    def _tournament_select(
+        self, 
+        candidates: List[ComponentOrganism], 
+        tournament_size: int = 3
+    ) -> ComponentOrganism:
+        """Tournament selection - pick best from random subset."""
+        import random
+        if len(candidates) <= tournament_size:
+            return max(candidates, key=lambda c: c.coherence_score)
+        
+        tournament = random.sample(candidates, tournament_size)
+        return max(tournament, key=lambda c: c.coherence_score)
+    
+    def _select_parents_for_crossover(
+        self, 
+        gap: GrowthGap
+    ) -> Tuple[Optional[ComponentOrganism], Optional[ComponentOrganism]]:
+        """Select two parents for crossover."""
+        candidates = [c for c in self.components if c.protocol_name == gap.protocol.name]
+        if len(candidates) < 2:
+            # Try any high-fitness components
+            candidates = sorted(self.components, key=lambda c: c.coherence_score, reverse=True)[:5]
+        
+        if len(candidates) < 2:
+            return None, None
+        
+        parent_a = self._tournament_select(candidates)
+        remaining = [c for c in candidates if c.id != parent_a.id]
+        if not remaining:
+            return parent_a, None
+        
+        parent_b = self._tournament_select(remaining)
+        return parent_a, parent_b
+    
+    def crossover(
+        self, 
+        parent_a: ComponentOrganism, 
+        parent_b: ComponentOrganism,
+        protocol: ProtocolSpec
+    ) -> str:
+        """
+        Genetic crossover between two parent implementations.
+        
+        Combines methods from both parents to create offspring.
+        Uses AST-based splicing for structural correctness.
+        """
+        try:
+            tree_a = ast.parse(parent_a.code)
+            tree_b = ast.parse(parent_b.code)
+        except SyntaxError:
+            # Fallback: just use parent_a
+            return parent_a.code
+        
+        # Find class definitions
+        class_a = None
+        class_b = None
+        for node in ast.walk(tree_a):
+            if isinstance(node, ast.ClassDef):
+                class_a = node
+                break
+        for node in ast.walk(tree_b):
+            if isinstance(node, ast.ClassDef):
+                class_b = node
+                break
+        
+        if not class_a or not class_b:
+            return parent_a.code
+        
+        # Extract methods from both
+        methods_a = {n.name: n for n in class_a.body if isinstance(n, ast.FunctionDef)}
+        methods_b = {n.name: n for n in class_b.body if isinstance(n, ast.FunctionDef)}
+        
+        # Crossover: randomly pick methods from each parent
+        import random
+        new_methods = []
+        all_method_names = set(methods_a.keys()) | set(methods_b.keys())
+        
+        for method_name in all_method_names:
+            if method_name in methods_a and method_name in methods_b:
+                # Both have it - pick randomly (favor higher fitness parent)
+                if parent_a.coherence_score > parent_b.coherence_score:
+                    choice = methods_a[method_name] if random.random() > 0.3 else methods_b[method_name]
+                else:
+                    choice = methods_b[method_name] if random.random() > 0.3 else methods_a[method_name]
+                new_methods.append(choice)
+            elif method_name in methods_a:
+                new_methods.append(methods_a[method_name])
+            else:
+                new_methods.append(methods_b[method_name])
+        
+        # Reconstruct class with crossover methods
+        class_a.body = [n for n in class_a.body if not isinstance(n, ast.FunctionDef)] + new_methods
+        
+        # Add imports from both
+        imports_a = [n for n in tree_a.body if isinstance(n, (ast.Import, ast.ImportFrom))]
+        imports_b = [n for n in tree_b.body if isinstance(n, (ast.Import, ast.ImportFrom))]
+        
+        # Simple dedup by unparsing
+        seen_imports = set()
+        unique_imports = []
+        for imp in imports_a + imports_b:
+            try:
+                imp_str = ast.unparse(imp)
+                if imp_str not in seen_imports:
+                    seen_imports.add(imp_str)
+                    unique_imports.append(imp)
+            except:
+                unique_imports.append(imp)
+        
+        # Build new module
+        new_tree = ast.Module(body=unique_imports + [class_a], type_ignores=[])
+        ast.fix_missing_locations(new_tree)
+        
+        try:
+            return ast.unparse(new_tree)
+        except:
+            return parent_a.code
+    
+    def refine(
+        self, 
+        component: ComponentOrganism, 
+        context: Dict[str, Any],
+        violations: List[str]
+    ) -> Optional[str]:
+        """
+        Targeted refinement for components with specific issues.
+        
+        Instead of regenerating from scratch, asks the generator
+        to fix specific problems.
+        """
+        protocol = context.get('protocol')
+        if not protocol:
+            return None
+        
+        # Build refinement prompt
+        from .generators.base import GenerationContext
+        
+        issues = "\n".join(f"- {v}" for v in violations[:5])  # Limit issues
+        
+        refine_instructions = f"""The following code has issues that need fixing:
+
+ISSUES TO FIX:
+{issues}
+
+Current implementation:
+```python
+{component.code}
+```
+
+Fix ONLY the listed issues. Keep everything else the same.
+Return the complete corrected implementation."""
+        
+        gen_context = GenerationContext(
+            protocol=protocol,
+            parent=component,
+            extra_instructions=refine_instructions,
+            pac_invariants=context.get('pac_invariants', [])
+        )
+        
+        try:
+            refined_code = self.generator.generate(gen_context)
+            return refined_code
+        except Exception:
+            return None
     
     def _record_stats(self, births: int, deaths: int) -> GenerationStats:
         """Record generation statistics."""

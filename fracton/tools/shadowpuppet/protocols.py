@@ -12,6 +12,34 @@ from typing import Dict, List, Optional, Any, Callable
 
 
 @dataclass
+class TypeAnnotation:
+    """
+    Rich type annotation for method signatures.
+    
+    Enables stronger contracts than string-based type hints.
+    
+    Example:
+        TypeAnnotation(
+            name="get_user",
+            params={"user_id": "str", "include_deleted": "bool = False"},
+            returns="Optional[User]",
+            raises=["ValueError", "NotFoundError"]
+        )
+    """
+    name: str
+    params: Dict[str, str] = field(default_factory=dict)  # param_name -> type_hint
+    returns: str = "Any"
+    raises: List[str] = field(default_factory=list)
+    async_method: bool = False
+    
+    def to_signature(self) -> str:
+        """Generate Python signature string."""
+        params = ", ".join(f"{k}: {v}" for k, v in self.params.items())
+        prefix = "async def" if self.async_method else "def"
+        return f"{prefix} {self.name}(self, {params}) -> {self.returns}"
+
+
+@dataclass
 class ProtocolSpec:
     """
     Architecture-as-code protocol specification.
@@ -22,11 +50,12 @@ class ProtocolSpec:
     
     Attributes:
         name: Protocol/class name to generate
-        methods: Required method names
+        methods: Required method names (strings or TypeAnnotation)
         docstring: Description and purpose
-        type_signature: Optional type hints as string
+        type_signature: Optional type hints as string (legacy)
+        method_signatures: Rich type annotations for methods
         pac_invariants: Conservation laws that must hold
-        attributes: Required class attributes
+        attributes: Required class attributes with types
         dependencies: Other protocols this depends on
     
     Example:
@@ -34,20 +63,25 @@ class ProtocolSpec:
             name="APIRouter",
             methods=["get", "post", "put", "delete"],
             docstring="REST API router with CRUD operations",
+            method_signatures=[
+                TypeAnnotation("get", {"path": "str"}, "Response"),
+                TypeAnnotation("post", {"path": "str", "body": "Dict"}, "Response"),
+            ],
             pac_invariants=[
                 "All routes return JSON responses",
                 "Errors use standard HTTP status codes"
             ],
-            attributes=["routes", "middleware"],
+            attributes=["routes: Dict[str, Callable]", "middleware: List[Callable]"],
             dependencies=["RequestHandler", "ResponseSerializer"]
         )
     """
     name: str
     methods: List[str]
     docstring: str
-    type_signature: str = ""
+    type_signature: str = ""  # Legacy string-based
+    method_signatures: List[TypeAnnotation] = field(default_factory=list)  # New rich types
     pac_invariants: List[str] = field(default_factory=list)
-    attributes: List[str] = field(default_factory=list)
+    attributes: List[str] = field(default_factory=list)  # Now supports "name: Type" format
     dependencies: List[str] = field(default_factory=list)
     
     def to_prompt_context(self) -> str:
@@ -55,8 +89,17 @@ class ProtocolSpec:
         lines = [
             f"Protocol: {self.name}",
             f"Description: {self.docstring}",
-            f"Methods: {', '.join(self.methods)}",
         ]
+        
+        # Rich method signatures if available
+        if self.method_signatures:
+            lines.append("Methods (with signatures):")
+            for sig in self.method_signatures:
+                lines.append(f"  {sig.to_signature()}")
+                if sig.raises:
+                    lines.append(f"    Raises: {', '.join(sig.raises)}")
+        else:
+            lines.append(f"Methods: {', '.join(self.methods)}")
         
         if self.attributes:
             lines.append(f"Attributes: {', '.join(self.attributes)}")
@@ -65,7 +108,7 @@ class ProtocolSpec:
             lines.append(f"Type Signature:\n{self.type_signature}")
             
         if self.pac_invariants:
-            lines.append("PAC Invariants (must be preserved):")
+            lines.append("PAC Invariants (MUST be enforced - will be validated):")
             for inv in self.pac_invariants:
                 lines.append(f"  - {inv}")
                 
@@ -73,6 +116,17 @@ class ProtocolSpec:
             lines.append(f"Dependencies: {', '.join(self.dependencies)}")
             
         return '\n'.join(lines)
+    
+    def get_attribute_types(self) -> Dict[str, str]:
+        """Parse attribute type hints from 'name: Type' format."""
+        result = {}
+        for attr in self.attributes:
+            if ':' in attr:
+                name, type_hint = attr.split(':', 1)
+                result[name.strip()] = type_hint.strip()
+            else:
+                result[attr] = 'Any'
+        return result
 
 
 @dataclass
