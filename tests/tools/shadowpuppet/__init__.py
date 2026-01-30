@@ -1,0 +1,1 @@
+"""ShadowPuppet test suite."""

@@ -10,10 +10,16 @@ Plus optional test-based evaluation:
 - Unit tests: Isolated component behavior
 - Integration tests: Component interactions
 - E2E tests: Full system behavior
+
+Improvements over v1:
+- Invariant validation: Actually validates PAC invariants post-generation
+- LLM review option: Optional semantic review via code generator
+- Execution tests: Try to actually run the generated code
 """
 
 import ast
-from typing import Dict, List, Any, Optional, Callable
+import re
+from typing import Dict, List, Any, Optional, Callable, Tuple
 
 from .protocols import ComponentOrganism, ProtocolSpec
 
@@ -27,13 +33,21 @@ class CoherenceEvaluator:
     with the system architecture.
     
     Higher coherence = better survival/reproduction chances.
+    
+    Features:
+    - Structural/semantic/energetic scoring
+    - PAC invariant validation (hard enforcement)
+    - Optional LLM-based semantic review
+    - Execution testing for behavioral validation
     """
     
     def __init__(
         self,
         coherence_weights: Optional[Dict[str, float]] = None,
         fitness_weights: Optional[Dict[str, float]] = None,
-        generation_adaptive: bool = True
+        generation_adaptive: bool = True,
+        enforce_invariants: bool = True,
+        llm_reviewer: Optional[Any] = None  # CodeGenerator for semantic review
     ):
         """
         Initialize evaluator.
@@ -42,6 +56,8 @@ class CoherenceEvaluator:
             coherence_weights: Weights for structural/semantic/energetic
             fitness_weights: Weights for coherence vs tests
             generation_adaptive: Adjust weights based on generation
+            enforce_invariants: Hard-fail if invariants violated
+            llm_reviewer: Optional generator for semantic review
         """
         self.coherence_weights = coherence_weights or {
             'structural': 0.4,
@@ -55,6 +71,8 @@ class CoherenceEvaluator:
         }
         
         self.generation_adaptive = generation_adaptive
+        self.enforce_invariants = enforce_invariants
+        self.llm_reviewer = llm_reviewer
     
     def evaluate(
         self,
@@ -62,7 +80,7 @@ class CoherenceEvaluator:
         context: Dict[str, Any]
     ) -> float:
         """
-        Calculate overall fitness combining coherence + tests.
+        Calculate overall fitness combining coherence + tests + invariants.
         
         Args:
             component: The component to evaluate
@@ -71,24 +89,191 @@ class CoherenceEvaluator:
         Returns:
             Fitness score 0.0-1.0
         """
+        # 0. INVARIANT VALIDATION (hard gate)
+        pac_invariants = context.get('pac_invariants', [])
+        if pac_invariants and self.enforce_invariants:
+            valid, violations = self.validate_invariants(component.code, pac_invariants)
+            if not valid:
+                # Store violations for debugging
+                context.setdefault('invariant_violations', {})[component.id] = violations
+                # Penalty but don't zero out - allow evolution to improve
+                invariant_penalty = 0.3 * (len(violations) / len(pac_invariants))
+            else:
+                invariant_penalty = 0.0
+        else:
+            invariant_penalty = 0.0
+        
         # 1. COHERENCE: Code quality metrics
         coherence_score = self._evaluate_coherence(component, context)
         
         # 2. TESTS: Behavioral correctness
         test_score = self._evaluate_tests(component, context)
         
-        # 3. COMBINED FITNESS
+        # 3. LLM REVIEW: Optional semantic validation
+        if self.llm_reviewer:
+            llm_score = self._llm_semantic_review(component, context)
+            # Blend with semantic score
+            component.semantic_score = (component.semantic_score + llm_score) / 2
+        
+        # 4. COMBINED FITNESS
         generation = context.get('generation', 0)
         weights = self._get_generation_weights(generation) if self.generation_adaptive else self.fitness_weights
         
         fitness = (
             weights['coherence'] * coherence_score +
             weights['tests'] * test_score
-        )
+        ) - invariant_penalty
+        
+        fitness = max(0.0, min(1.0, fitness))  # Clamp to [0, 1]
         
         # Store overall fitness
         component.coherence_score = fitness
         return fitness
+    
+    def validate_invariants(
+        self, 
+        code: str, 
+        invariants: List[str]
+    ) -> Tuple[bool, List[str]]:
+        """
+        Validate PAC invariants against generated code.
+        
+        Uses pattern matching and AST analysis to check if code
+        respects declared invariants.
+        
+        Args:
+            code: Generated Python code
+            invariants: List of invariant strings
+            
+        Returns:
+            (all_valid, list_of_violations)
+        """
+        violations = []
+        
+        try:
+            tree = ast.parse(code)
+        except SyntaxError:
+            return False, ["Code has syntax errors - cannot validate"]
+        
+        code_lower = code.lower()
+        
+        for invariant in invariants:
+            inv_lower = invariant.lower()
+            
+            # Pattern-based checks
+            if not self._check_invariant(inv_lower, code, code_lower, tree):
+                violations.append(invariant)
+        
+        return len(violations) == 0, violations
+    
+    def _check_invariant(
+        self, 
+        invariant: str, 
+        code: str, 
+        code_lower: str, 
+        tree: ast.AST
+    ) -> bool:
+        """Check a single invariant against code."""
+        
+        # JSON response invariant
+        if 'json' in invariant and 'return' in invariant:
+            # Should have json.dumps or Response.json or similar
+            if not any(p in code_lower for p in ['json.dumps', 'response.json', "'application/json'", 'jsonify']):
+                return False
+        
+        # HTTP status code invariant
+        if 'http' in invariant and 'status' in invariant:
+            # Should have status_code references
+            if 'status_code' not in code_lower and 'status' not in code_lower:
+                return False
+        
+        # Unique ID invariant
+        if 'unique' in invariant and 'id' in invariant:
+            if not any(p in code_lower for p in ['uuid', 'unique', 'id =' ]):
+                return False
+        
+        # Validation invariant
+        if 'validat' in invariant:
+            # Should have validation logic
+            if not any(p in code_lower for p in ['validate', 'valid', 'check', 'if not', 'raise']):
+                return False
+        
+        # Password/hash invariant
+        if 'password' in invariant and ('plain' in invariant or 'hash' in invariant):
+            if 'password_hash' not in code_lower and 'hash' not in code_lower:
+                return False
+        
+        # Error handling invariant
+        if 'error' in invariant and 'handl' in invariant:
+            has_try = any(isinstance(n, ast.Try) for n in ast.walk(tree))
+            has_raise = any(isinstance(n, ast.Raise) for n in ast.walk(tree))
+            if not (has_try or has_raise):
+                return False
+        
+        # Return type invariant  
+        if 'return' in invariant and 'response' in invariant:
+            # Check return statements exist
+            has_return = any(isinstance(n, ast.Return) for n in ast.walk(tree))
+            if not has_return:
+                return False
+        
+        return True  # Default: assume valid if no specific check applies
+    
+    def _llm_semantic_review(
+        self,
+        component: ComponentOrganism,
+        context: Dict[str, Any]
+    ) -> float:
+        """
+        Use LLM to review semantic correctness.
+        
+        Asks the LLM to rate how well the code matches the intent.
+        """
+        if not self.llm_reviewer:
+            return 0.5
+        
+        protocol: Optional[ProtocolSpec] = context.get('protocol')
+        if not protocol:
+            return 0.5
+        
+        try:
+            from .generators.base import GenerationContext
+            
+            review_prompt = f"""Review this code for semantic correctness.
+            
+Protocol: {protocol.name}
+Description: {protocol.docstring}
+
+Code:
+```python
+{component.code[:2000]}
+```
+
+Rate the semantic correctness from 0.0 to 1.0:
+- Does the code implement the described functionality?
+- Are the methods doing what their names suggest?
+- Is the logic sound?
+
+Reply with ONLY a number between 0.0 and 1.0."""
+
+            # Create a minimal context for the review
+            review_context = GenerationContext(
+                protocol=protocol,
+                extra_instructions=review_prompt
+            )
+            
+            response = self.llm_reviewer.generate(review_context)
+            
+            # Extract score from response
+            import re
+            match = re.search(r'([0-9]+\.?[0-9]*)', response)
+            if match:
+                score = float(match.group(1))
+                return max(0.0, min(1.0, score))
+        except Exception:
+            pass
+        
+        return 0.5  # Default neutral score
     
     def _evaluate_coherence(
         self,

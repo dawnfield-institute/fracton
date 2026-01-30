@@ -46,7 +46,7 @@ Example:
     results = evolution.grow([GrowthGap(protocol=api_protocol)])
 """
 
-from .protocols import ProtocolSpec, GrowthGap, ComponentOrganism, TestSuite
+from .protocols import ProtocolSpec, GrowthGap, ComponentOrganism, TestSuite, TypeAnnotation
 from .coherence import CoherenceEvaluator
 from .evolution import SoftwareEvolution, CodeEnvironment, EvolutionConfig
 from .genealogy import GenealogyTree
@@ -65,6 +65,7 @@ __all__ = [
     'GrowthGap', 
     'ComponentOrganism',
     'TestSuite',
+    'TypeAnnotation',
     
     # Evaluation
     'CoherenceEvaluator',
@@ -84,4 +85,4 @@ __all__ = [
     'MockGenerator',
 ]
 
-__version__ = '0.1.0'
+__version__ = '0.2.0'
