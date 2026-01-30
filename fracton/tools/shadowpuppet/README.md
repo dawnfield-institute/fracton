@@ -208,6 +208,31 @@ gap = GrowthGap(
 )
 ```
 
+### Dependency Resolution
+
+Components are generated in topological order based on `dependencies`:
+
+```python
+# Define dependencies
+user_service = ProtocolSpec(name="UserService", dependencies=[])
+api_router = ProtocolSpec(name="APIRouter", dependencies=["UserService"])
+webapp = ProtocolSpec(name="WebApp", dependencies=["APIRouter", "UserService"])
+
+# Evolution automatically orders: UserService → APIRouter → WebApp
+# Each component sees its dependencies' implementations during generation
+```
+
+The generator receives `resolved_dependencies` in context:
+
+```python
+context.resolved_dependencies = {
+    "UserService": <ComponentOrganism>,  # Already generated
+    "APIRouter": <ComponentOrganism>     # Already generated
+}
+```
+
+This enables components to reference real implementations, not just specs.
+
 ### Generators
 
 Pluggable code generators:
@@ -215,27 +240,61 @@ Pluggable code generators:
 | Generator | Description | Requirements |
 |-----------|-------------|--------------|
 | `MockGenerator` | Template-based, no AI | None |
+| `RandomVariationGenerator` | Mock with random variation | None |
 | `CopilotGenerator` | GitHub Copilot CLI | `gh copilot` installed |
 | `ClaudeGenerator` | Claude API | `ANTHROPIC_API_KEY` |
-| `ClaudeCodeGenerator` | Claude Code CLI | `claude` installed |
+| `ClaudeCodeGenerator` | Claude Code CLI | `claude` CLI installed |
+
+```python
+# ClaudeGenerator with fallback
+from fracton.tools.shadowpuppet.generators import ClaudeGenerator, MockGenerator
+
+generator = ClaudeGenerator(
+    model="claude-sonnet-4-20250514",
+    temperature=0.3,           # Lower = more deterministic
+    max_tokens=4096,
+    fallback_generator=MockGenerator()  # Used if API fails
+)
+
+# ClaudeCodeGenerator (CLI-based)
+from fracton.tools.shadowpuppet.generators import ClaudeCodeGenerator
+
+generator = ClaudeCodeGenerator(
+    timeout=120,               # Generation timeout
+    fallback_generator=MockGenerator()
+)
+```
 
 ### Coherence Evaluation
 
 Three-dimensional fitness scoring:
 
-- **Structural** (0-1): Type correctness, method signatures
+- **Structural** (0-1): Type correctness, method signatures, AST validity
 - **Semantic** (0-1): Logic alignment with docstring/invariants
-- **Energetic** (0-1): Efficiency, resource usage
+- **Energetic** (0-1): Efficiency, simplicity, resource usage
 
 Combined: `fitness = (structural * semantic * energetic) ^ (1/3)`
+
+**Generation-Adaptive Weights**: Early generations use 85% coherence / 15% tests to prevent premature extinction. Later generations shift toward test-heavy evaluation.
 
 **PAC Invariant Validation** (New in v0.2):
 ```python
 evaluator = CoherenceEvaluator(
     enforce_invariants=True,  # Hard-fail on violations
-    llm_reviewer=ClaudeGenerator()  # Optional semantic review
+    llm_reviewer=ClaudeGenerator(),  # Optional semantic review
+    generation_adaptive=True  # Adjust weights by generation
 )
 ```
+
+**Pattern-Based Invariant Checks**:
+
+| Invariant Pattern | What It Checks |
+|-------------------|----------------|
+| "JSON" + "return" | `json.dumps`, `Response.json`, `jsonify` |
+| "HTTP" + "status" | `status_code` references |
+| "unique" + "id" | `uuid`, uniqueness logic |
+| "validat*" | Validation logic, `raise`, `if not` |
+| "hash" + "password" | Password hashing patterns |
 
 ### EvolutionConfig
 
@@ -256,6 +315,51 @@ EvolutionConfig(
     refinement_threshold=0.5,      # Score to trigger refinement
     max_refinement_attempts=2
 )
+```
+
+### Genealogy Tracking
+
+Every component tracks its full lineage:
+
+```python
+# Access genealogy after evolution
+tree = evolution.genealogy
+
+# Get derivation path (root → component)
+path = tree.get_derivation_path(component.id)
+print(f"Lineage: {' → '.join(path)}")
+
+# Get descendants
+children = tree.get_children(component.id)
+all_descendants = tree.get_descendants(component.id)
+
+# Each node tracks:
+# - component_id, protocol_name
+# - parent_id, generation
+# - coherence_score, generator_used
+# - timestamp, children
+```
+
+Useful for understanding *why* code evolved the way it did — trace failures back through ancestry.
+
+### CodeEnvironment
+
+The selection pressure mechanism:
+
+```python
+from fracton.tools.shadowpuppet import CodeEnvironment
+
+env = CodeEnvironment(
+    coherence_threshold=0.70,  # Survival threshold
+    max_population=50
+)
+
+# Check if component survives
+survives = env.check_survival(component)  # coherence >= threshold
+
+# Calculate integration energy (resources for survivors)
+energy = env.harvest_integration_energy(component)
+# Higher coherence = more energy = better reproduction chances
 ```
 
 ### Crossover (New in v0.2)
@@ -398,8 +502,33 @@ class MyGenerator(CodeGenerator):
 ## Limitations
 
 - **Scale**: Works well for ~10-20 components. The n² interaction explosion means larger systems need decomposition into subsystems.
-- **Novel architecture**: Can only generate what's in LLM training data. Novel patterns require human design.
+- **Implementation patterns**: LLMs can only generate *implementation* patterns from training data (loops, classes, APIs). But that's fine — implementation is solved.
 - **Integration testing**: Currently validates components individually. Cross-component integration is a gap.
+
+### On "Novel Architecture"
+
+**The spec IS the novel architecture.** You define unprecedented architectures in seed files (like GAIA's PAC/SEC dynamics — BalanceOperator with Ξ constants, CollapseDetector watching ∇I vs ∇H — none of this exists in training data). The LLM provides implementation vocabulary, not architectural vision.
+
+Novelty lives in the protocol specs. Implementation is just plumbing.
+
+## What's Next
+
+### v0.4 (Planned)
+- **Integration Fitness**: Evaluate component *pairs*, not just individuals
+- **Incremental Evolution**: Preserve population across runs, resume from checkpoint
+- **Property-Based Testing**: Hypothesis integration for invariant fuzzing
+- **Multi-Objective Coherence**: Pareto frontier (fast-but-fragile vs slow-but-robust)
+
+### v0.5 (Exploratory)
+- **Subsystem Decomposition**: Automatic splitting for >20 component systems
+- **Live Refinement**: Watch mode that re-evolves on spec changes
+- **Provenance Tracing**: When production fails, trace back through genealogy
+- **Visual Genealogy**: Graph visualization of component evolution
+
+### Research Directions
+- **Self-Modifying Seeds**: Can evolution propose spec changes?
+- **Cross-Seed Breeding**: Combine architectures from different domains
+- **Coherence Gradients**: Use fitness landscape topology for directed search
 
 ## License
 
