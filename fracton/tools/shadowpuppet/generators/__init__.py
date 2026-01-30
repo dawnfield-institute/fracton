@@ -12,13 +12,15 @@ Available generators:
 
 from .base import CodeGenerator, GenerationContext
 from .copilot import CopilotGenerator
-from .claude import ClaudeGenerator
-from .mock import MockGenerator
+from .claude import ClaudeGenerator, ClaudeCodeGenerator
+from .mock import MockGenerator, RandomVariationGenerator
 
 __all__ = [
     'CodeGenerator',
     'GenerationContext',
     'CopilotGenerator', 
     'ClaudeGenerator',
+    'ClaudeCodeGenerator',
     'MockGenerator',
+    'RandomVariationGenerator',
 ]

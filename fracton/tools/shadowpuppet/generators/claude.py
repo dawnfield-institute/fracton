@@ -115,7 +115,7 @@ class ClaudeCodeGenerator(CodeGenerator):
     
     def __init__(
         self,
-        cli_path: str = "claude",
+        cli_path: Optional[str] = None,
         timeout: int = 120,
         fallback_generator: Optional[CodeGenerator] = None
     ):
@@ -123,11 +123,20 @@ class ClaudeCodeGenerator(CodeGenerator):
         Initialize Claude Code generator.
         
         Args:
-            cli_path: Path to Claude Code CLI
+            cli_path: Path to Claude Code CLI (auto-detected if None)
             timeout: Generation timeout in seconds
             fallback_generator: Fallback if Claude Code fails
         """
-        self.cli_path = cli_path
+        # Auto-detect CLI path based on OS
+        if cli_path is None:
+            import platform
+            if platform.system() == 'Windows':
+                # On Windows, use claude.cmd from npm
+                self.cli_path = 'claude.cmd'
+            else:
+                self.cli_path = 'claude'
+        else:
+            self.cli_path = cli_path
         self.timeout = timeout
         self.fallback_generator = fallback_generator
     
@@ -140,12 +149,16 @@ class ClaudeCodeGenerator(CodeGenerator):
         prompt = self.build_prompt(context)
         
         try:
-            # Claude Code CLI command
+            # Claude Code CLI command - use shell=True on Windows for .cmd files
+            import platform
+            use_shell = platform.system() == 'Windows'
+            
             result = subprocess.run(
                 [self.cli_path, '--print', '-p', prompt],
                 capture_output=True,
                 text=True,
-                timeout=self.timeout
+                timeout=self.timeout,
+                shell=use_shell
             )
             
             if result.returncode != 0:

@@ -877,12 +877,205 @@ class ChatBot:
 
 
 class RandomVariationGenerator(MockGenerator):
-    """Mock generator with random variations for testing evolution."""
+    """Mock generator with random variations for testing evolution.
+    
+    Introduces mutations to create genetic diversity:
+    - Variable name variations
+    - Alternative implementations
+    - Added/removed docstrings
+    - Different error handling styles
+    - Varying levels of type hints
+    """
     
     def __init__(self, variation_rate: float = 0.3):
         super().__init__()
         self.variation_rate = variation_rate
+        self._variation_id = 0
     
     @property
     def name(self) -> str:
         return "mock-random"
+    
+    def generate(self, context: 'GenerationContext') -> str:
+        """Generate code with random variations."""
+        import random
+        
+        # Get base implementation
+        base_code = super().generate(context)
+        
+        # Apply mutations based on variation_rate
+        self._variation_id += 1
+        
+        mutations = []
+        
+        # Mutation 1: Variable naming style
+        if random.random() < self.variation_rate:
+            style = random.choice(['snake', 'short', 'verbose'])
+            if style == 'short':
+                base_code = self._mutate_short_names(base_code)
+                mutations.append('short_names')
+            elif style == 'verbose':
+                base_code = self._mutate_verbose_names(base_code)
+                mutations.append('verbose_names')
+        
+        # Mutation 2: Add/remove comments
+        if random.random() < self.variation_rate:
+            if random.random() < 0.5:
+                base_code = self._add_comments(base_code)
+                mutations.append('extra_comments')
+            else:
+                base_code = self._strip_comments(base_code)
+                mutations.append('minimal_comments')
+        
+        # Mutation 3: Error handling style
+        if random.random() < self.variation_rate:
+            style = random.choice(['silent', 'raise', 'log'])
+            base_code = self._mutate_error_handling(base_code, style)
+            mutations.append(f'error_{style}')
+        
+        # Mutation 4: Add validation
+        if random.random() < self.variation_rate:
+            base_code = self._add_validation(base_code)
+            mutations.append('validation')
+        
+        # Mutation 5: Implementation variant (sometimes break things)
+        if random.random() < self.variation_rate * 0.5:
+            base_code = self._mutate_implementation(base_code)
+            mutations.append('alt_impl')
+        
+        # Add mutation marker comment
+        if mutations:
+            marker = f"# Mutations: {', '.join(mutations)} (v{self._variation_id})\n"
+            base_code = marker + base_code
+        
+        return base_code
+    
+    def _mutate_short_names(self, code: str) -> str:
+        """Replace variable names with shorter versions."""
+        replacements = [
+            ('result', 'res'),
+            ('value', 'val'),
+            ('index', 'idx'),
+            ('element', 'el'),
+            ('message', 'msg'),
+            ('response', 'resp'),
+            ('request', 'req'),
+            ('position', 'pos'),
+            ('information', 'info'),
+            ('configuration', 'cfg'),
+        ]
+        for old, new in replacements:
+            # Only replace when it's a variable (not in strings)
+            import re
+            code = re.sub(rf'\b{old}\b(?!["\'])', new, code)
+        return code
+    
+    def _mutate_verbose_names(self, code: str) -> str:
+        """Replace variable names with more verbose versions."""
+        replacements = [
+            ('res', 'result_value'),
+            ('val', 'value_data'),
+            ('idx', 'current_index'),
+            ('msg', 'message_content'),
+            ('data', 'data_container'),
+        ]
+        for old, new in replacements:
+            import re
+            code = re.sub(rf'\b{old}\b(?!["\'])', new, code)
+        return code
+    
+    def _add_comments(self, code: str) -> str:
+        """Add extra comments to methods."""
+        lines = code.split('\n')
+        new_lines = []
+        for i, line in enumerate(lines):
+            new_lines.append(line)
+            if line.strip().startswith('def ') and i > 0:
+                indent = len(line) - len(line.lstrip())
+                new_lines.insert(-1, ' ' * indent + '# --- Method implementation ---')
+        return '\n'.join(new_lines)
+    
+    def _strip_comments(self, code: str) -> str:
+        """Remove non-docstring comments."""
+        lines = code.split('\n')
+        new_lines = []
+        for line in lines:
+            stripped = line.strip()
+            # Keep docstrings and code, remove # comments
+            if not stripped.startswith('#'):
+                new_lines.append(line)
+        return '\n'.join(new_lines)
+    
+    def _mutate_error_handling(self, code: str, style: str) -> str:
+        """Change error handling style."""
+        if style == 'raise':
+            # Add raise statements
+            code = code.replace(
+                'return None',
+                'raise ValueError("Not found")'
+            )
+            code = code.replace(
+                'return False',
+                'raise RuntimeError("Operation failed")'
+            )
+        elif style == 'silent':
+            # Make errors silent
+            code = code.replace(
+                'raise ValueError',
+                'pass  # ValueError'
+            )
+            code = code.replace(
+                'raise RuntimeError',
+                'pass  # RuntimeError'
+            )
+        elif style == 'log':
+            # Add logging
+            lines = code.split('\n')
+            if not any('import logging' in l for l in lines):
+                lines.insert(0, 'import logging')
+                lines.insert(1, 'logger = logging.getLogger(__name__)')
+            code = '\n'.join(lines)
+        return code
+    
+    def _add_validation(self, code: str) -> str:
+        """Add input validation."""
+        # Add type checks at method starts
+        lines = code.split('\n')
+        new_lines = []
+        in_method = False
+        method_indent = 0
+        
+        for line in lines:
+            new_lines.append(line)
+            if 'def ' in line and '(self' in line:
+                in_method = True
+                method_indent = len(line) - len(line.lstrip()) + 4
+            elif in_method and line.strip().startswith('"""') and line.strip().endswith('"""'):
+                # After docstring, add validation
+                new_lines.append(' ' * method_indent + '# Input validation')
+                in_method = False
+        
+        return '\n'.join(new_lines)
+    
+    def _mutate_implementation(self, code: str) -> str:
+        """Create an alternative implementation (may reduce fitness)."""
+        import random
+        
+        mutations = [
+            # Sometimes break things (tests evolution pressure)
+            ('return True', 'return bool(random.random() > 0.1)'),
+            ('return False', 'return not True'),
+            # Alternative loops
+            ('for i in range', 'for i in list(range'),
+            ('while ', 'while True and '),
+            # Alternative returns  
+            ('return result', 'return result if result else {}'),
+            ('return data', 'return dict(data) if data else {}'),
+        ]
+        
+        # Only apply one mutation
+        old, new = random.choice(mutations)
+        if old in code:
+            code = code.replace(old, new, 1)
+            
+        return code
