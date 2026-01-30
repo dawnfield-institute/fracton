@@ -19,6 +19,29 @@ The seed file becomes the artifact. Code becomes a derived projection — regene
 
 This is **not** "AI writes code for you." This is **tooling for the next abstraction layer** — the one that defines what it means for code to be architecturally coherent.
 
+## The Recursion
+
+Who writes the specs? You can. Or AI can. Or both.
+
+The insight: **the spec is the checkpoint, not the author**.
+
+```
+Vibe-coding:    AI → code → code → code  (no stable artifact)
+ShadowPuppet:   AI → SPEC → code → SPEC → code  (spec is the checkpoint)
+```
+
+In pure vibe-coding, there's no validation surface. You can't pause and inspect the architecture because there isn't one — just code calling code.
+
+ShadowPuppet creates **crystallization points**. Whether human or AI writes the `ProtocolSpec`, the spec exists as:
+- A readable, diffable artifact
+- A validation target (does implementation match?)
+- Context for the next generation (resolved_dependencies)
+- A point where you can intervene, inspect, or redirect
+
+This enables **structured recursion**: AI generates architecture, architecture constrains implementation, implementation becomes context, context informs next architecture. The loop can run autonomously, but every cycle produces a legible checkpoint.
+
+Think of DNA — not designed, but still a spec. It evolved, but it's stable, heritable, and constrains protein synthesis. ShadowPuppet makes the spec explicit so the recursion remains auditable.
+
 ## The Metaphor
 
 - **Protocol** is the puppet (structure, joints, constraints)
