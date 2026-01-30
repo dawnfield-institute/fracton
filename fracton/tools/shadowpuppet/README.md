@@ -1,24 +1,44 @@
 # ShadowPuppet
 
-**Architecture-as-Code Evolution Framework** (v0.2.0)
+**Architecture-as-Code Evolution Framework** (v0.3.0)
 
-A model-agnostic framework for evolving software through protocol-driven generation.
+## The Idea
+
+Code generation is solved. Architecture isn't.
+
+LLMs can write functions, classes, even small systems. But they hit a wall at **architecture**.. the exponential explosion of interactions between components, the judgment calls about where to draw boundaries, the invariants that must hold across an entire system.
+
+ShadowPuppet doesn't try to solve architecture. It provides a **process for navigating architectural space**:
+
+1. **Declare what coherence means** — Protocols, invariants, dependencies, tests
+2. **Let AI explore implementations** — Generate candidates that might satisfy those constraints
+3. **Evaluate fitness** — Structural correctness, semantic alignment, execution validity
+4. **Select survivors** — Only coherent implementations persist
+
+The seed file becomes the artifact. Code becomes a derived projection — regenerable, disposable, always consistent with the spec.
+
+This is **not** "AI writes code for you." This is **tooling for the next abstraction layer** — the one that defines what it means for code to be architecturally coherent.
 
 ## The Metaphor
 
 - **Protocol** is the puppet (structure, joints, constraints)
 - **Generator** is the puppeteer (brings it to life)
 - **Shadow** is the generated code (the projection that runs)
-- **Evolution** selects better puppets (architecture improvement)
+- **Evolution** selects better shadows (implementation improvement)
 
-## What's New in v0.2
+## What's New in v0.3
 
+- **Dependency Ordering** — Topological sort ensures components generate in correct order
+- **Domain Types** — Pass dataclass/type definitions to generators for context
+- **Test Suites** — Attach unit tests to gaps; tests run during fitness evaluation
+- **ClaudeGenerator Integration** — All seeds now use real Claude API with MockGenerator fallback
+- **Improved Coherence Scoring** — 85/15 weighting for early generations prevents premature extinction
+
+### From v0.2
 - **Rich Type Signatures** - `TypeAnnotation` for stronger method contracts
 - **Genetic Crossover** - Combine methods from high-fitness parents
 - **PAC Invariant Validation** - Hard enforcement of conservation laws
 - **Targeted Refinement** - Fix specific issues in borderline candidates
-- **LLM Semantic Review** - Optional AI-based semantic validation
-- **Tournament Selection** - Better parent selection strategy
 
 ## Quick Start
 
@@ -27,41 +47,87 @@ from fracton.tools.shadowpuppet import (
     SoftwareEvolution,
     ProtocolSpec,
     GrowthGap,
-    MockGenerator,
-    TypeAnnotation
+    EvolutionConfig,
+    TestSuite
 )
+from fracton.tools.shadowpuppet.generators import ClaudeGenerator, MockGenerator
 
-# Define architecture with rich types
-api_protocol = ProtocolSpec(
-    name="APIRouter",
-    methods=["get", "post", "put", "delete"],
-    method_signatures=[
-        TypeAnnotation("get", {"path": "str"}, "Response"),
-        TypeAnnotation("post", {"path": "str", "body": "Dict"}, "Response", raises=["ValidationError"]),
+# Define your domain types
+DOMAIN_TYPES = [
+    '''
+@dataclass
+class User:
+    id: str
+    email: str
+    name: str
+    '''
+]
+
+# Define architecture with dependencies
+user_service = ProtocolSpec(
+    name="UserService",
+    methods=["create_user", "get_user", "update_user", "delete_user"],
+    docstring="User management with validation",
+    attributes=["users: Dict[str, User]"],
+    pac_invariants=[
+        "User IDs are unique",
+        "Emails are validated before storage"
     ],
-    docstring="REST API router with CRUD operations",
-    pac_invariants=["All routes return JSON", "Errors use standard HTTP codes"],
-    attributes=["routes: Dict[str, Callable]", "middleware: List[Callable]"]
+    dependencies=[]  # No dependencies
 )
 
-# Create evolution with crossover and refinement
-from fracton.tools.shadowpuppet.evolution import EvolutionConfig
+api_router = ProtocolSpec(
+    name="APIRouter",
+    methods=["get", "post", "handle_request"],
+    docstring="REST API router",
+    attributes=["routes: Dict[str, Callable]", "user_service: UserService"],
+    pac_invariants=["All routes return Response objects"],
+    dependencies=["UserService"]  # Depends on UserService
+)
 
-evolution = SoftwareEvolution(
-    generator=MockGenerator(),
-    config=EvolutionConfig(
-        coherence_threshold=0.65,
-        enable_crossover=True,
-        enable_refinement=True
-    )
+# Define tests
+def test_user_crud(service):
+    user = service.create_user("test@example.com", "Test")
+    assert service.get_user(user.id) is not None
+    return True
+
+# Create gaps with tests and domain context
+gaps = [
+    GrowthGap(
+        protocol=user_service,
+        test_suite=TestSuite(unit=[test_user_crud]),
+        domain_types=DOMAIN_TYPES
+    ),
+    GrowthGap(
+        protocol=api_router,
+        domain_types=DOMAIN_TYPES
+    ),
+]
+
+# Configure evolution
+config = EvolutionConfig(
+    coherence_threshold=0.65,
+    candidates_per_gap=3,
+    max_generations=10
+)
+
+# Use Claude with MockGenerator fallback
+generator = ClaudeGenerator(
+    model="claude-sonnet-4-20250514",
+    fallback_generator=MockGenerator()
 )
 
 # Evolve!
-results = evolution.grow([GrowthGap(protocol=api_protocol)])
+evolution = SoftwareEvolution(generator=generator, config=config)
+results = evolution.grow(gaps)
 
-# Get generated code
+# Components are generated in dependency order:
+# UserService first, then APIRouter (which can reference UserService)
 for component in evolution.components:
     print(f"{component.id}: {component.coherence_score:.3f}")
+
+# Save generated code
+evolution.save_code(Path("generated/"))
 ```
 
 ## Key Concepts
@@ -107,8 +173,38 @@ Identifies what needs to be generated:
 ```python
 GrowthGap(
     protocol=user_protocol,
-    parent_components=[existing_component],  # Optional: context for AI
+    test_suite=TestSuite(unit=[test_func1, test_func2]),  # v0.3: attached tests
+    domain_types=["@dataclass\nclass User: ..."],        # v0.3: type context
+    parent_components=[existing_component],               # Optional: context for AI
     priority=1.0
+)
+```
+
+### TestSuite (New in v0.3)
+
+Attach tests that run during fitness evaluation:
+
+```python
+def test_user_creation(service):
+    """Test must accept instance and return bool."""
+    user = service.create_user("test@example.com", "Test User")
+    return user is not None and user.email == "test@example.com"
+
+def test_user_uniqueness(service):
+    service.create_user("dup@example.com", "First")
+    try:
+        service.create_user("dup@example.com", "Second")
+        return False  # Should have raised
+    except ValueError:
+        return True
+
+gap = GrowthGap(
+    protocol=user_protocol,
+    test_suite=TestSuite(
+        unit=[test_user_creation, test_user_uniqueness],
+        integration=[],  # Future: cross-component tests
+        property=[]      # Future: property-based tests
+    )
 )
 ```
 
@@ -187,6 +283,22 @@ refined = evolution.refine(component, context, ["Fix: passwords not hashed"])
 
 ## Examples
 
+### GAIA (PAC/SEC Dynamics)
+
+```bash
+python -m fracton.tools.shadowpuppet.examples.gaia_seed
+```
+
+An 8-component system modeling information-entropy dynamics:
+- `InformationField` - Information density field
+- `EntropyField` - Entropy density field  
+- `PACAggregator` - Potential-Actualization conservation
+- `BalanceOperator` - Field equilibrium (Xi constant)
+- `CollapseDetector` - SEC collapse events
+- `RecursiveLayer` - Recursive balance feedback
+- `StructureEmitter` - Structure crystallization
+- `GAIAModel` - Main orchestrator
+
 ### Web Application
 
 ```bash
@@ -194,8 +306,8 @@ python -m fracton.tools.shadowpuppet.examples.webapp_seed
 ```
 
 Generates:
-- `APIRouter` - REST routing with decorators and middleware
-- `UserService` - CRUD with validation and authentication
+- `APIRouter` - REST routing with middleware
+- `UserService` - CRUD with validation
 - `TemplateRenderer` - HTML templates with escaping
 - `StaticFileServer` - Static files with MIME types
 - `WebApp` - HTTP server orchestrator
@@ -207,48 +319,63 @@ python -m fracton.tools.shadowpuppet.examples.chatbot_seed
 ```
 
 Generates:
-- `IntentClassifier` - Keyword-based intent detection
+- `IntentClassifier` - Intent detection with confidence
 - `ResponseGenerator` - Template-based responses
 - `ConversationManager` - Session and history management
-- `ChatBot` - Main orchestrator with CLI mode
+- `ChatBot` - Main orchestrator
 
 ## Architecture
 
 ```
 shadowpuppet/
 ├── __init__.py          # Public API
-├── protocols.py         # ProtocolSpec, GrowthGap, ComponentOrganism
-├── coherence.py         # CoherenceEvaluator
-├── evolution.py         # SoftwareEvolution engine
-├── genealogy.py         # GenealogyTree for provenance
+├── protocols.py         # ProtocolSpec, GrowthGap, TestSuite, ComponentOrganism
+├── coherence.py         # CoherenceEvaluator (structural, semantic, execution)
+├── evolution.py         # SoftwareEvolution engine with dependency ordering
+├── genealogy.py         # GenealogyTree for provenance tracking
 ├── generators/
-│   ├── base.py          # CodeGenerator protocol
-│   ├── mock.py          # Template-based (no AI)
+│   ├── base.py          # CodeGenerator protocol, GenerationContext
+│   ├── mock.py          # Template-based (no AI, for testing)
 │   ├── copilot.py       # GitHub Copilot CLI
 │   └── claude.py        # Claude API + Claude Code CLI
 └── examples/
-    ├── webapp_seed.py   # Frontend + API example
-    └── chatbot_seed.py  # Chatbot example
+    ├── gaia_seed.py     # PAC/SEC dynamics (8 components)
+    ├── webapp_seed.py   # Frontend + API (5 components)
+    └── chatbot_seed.py  # Chatbot (4 components)
 ```
 
 ## Theoretical Foundation
 
-ShadowPuppet implements PAC (Potential-Actualization Conservation) from Dawn Field Theory:
+ShadowPuppet implements concepts from Dawn Field Theory:
 
+### PAC (Potential-Actualization Conservation)
 - **Potential** = Protocol specification (what could be)
 - **Actualization** = Generated code (what is)
 - **Conservation** = Coherence ensures the actualized code preserves the protocol's intent
 
-The evolution process applies SEC (Symbolic Entropy Collapse):
-- High-fitness candidates represent lower entropy (more coherent)
-- Selection pressure drives the system toward structured solutions
+### SEC (Symbolic Entropy Collapse)
+The evolution process applies SEC dynamics:
+- **Information gradient** (∇I) = Protocol constraints that must be satisfied
+- **Entropy gradient** (∇H) = Random variation in generation
+- **Collapse boundary** = Coherence threshold where structure crystallizes
+
+High-fitness candidates represent lower entropy (more coherent structure).
+Selection pressure drives the system toward solutions that balance constraint satisfaction with implementation flexibility.
+
+### Why Evolution?
+Single-shot generation works for isolated components. But architecture involves **n² interactions** between n components. Evolution provides:
+- **Constraint propagation** — Dependencies ensure components see their dependencies' implementations
+- **Feedback loops** — Tests validate cross-component behavior
+- **Selection pressure** — Only coherent implementations survive
+
+The seed file defines the collapse boundary. Evolution finds what crystallizes within those constraints.
 
 ## Custom Generators
 
 Implement the `CodeGenerator` protocol:
 
 ```python
-from fracton.tools.shadowpuppet import CodeGenerator, GenerationContext
+from fracton.tools.shadowpuppet.generators import CodeGenerator, GenerationContext
 
 class MyGenerator(CodeGenerator):
     @property
@@ -256,11 +383,23 @@ class MyGenerator(CodeGenerator):
         return "my-generator"
     
     def generate(self, context: GenerationContext) -> str:
-        # context.protocol - the ProtocolSpec
-        # context.parent_code - optional parent context
-        # context.temperature - creativity parameter
-        return "# Your generated code here"
+        # Available context:
+        # - context.protocol: ProtocolSpec to implement
+        # - context.domain_types: List[str] of type definitions
+        # - context.resolved_dependencies: Dict[str, ComponentOrganism]
+        # - context.parent_code: Optional parent implementation
+        # - context.temperature: Creativity parameter
+        
+        prompt = self.build_prompt(context)  # Use built-in prompt builder
+        # ... call your LLM ...
+        return self.extract_code(response)   # Extract code from response
 ```
+
+## Limitations
+
+- **Scale**: Works well for ~10-20 components. The n² interaction explosion means larger systems need decomposition into subsystems.
+- **Novel architecture**: Can only generate what's in LLM training data. Novel patterns require human design.
+- **Integration testing**: Currently validates components individually. Cross-component integration is a gap.
 
 ## License
 

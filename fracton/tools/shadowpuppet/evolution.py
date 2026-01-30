@@ -648,7 +648,7 @@ Return the complete corrected implementation."""
             filename = f"{component.protocol_name.lower()}.py"
             path = output_dir / filename
             
-            with open(path, 'w') as f:
+            with open(path, 'w', encoding='utf-8') as f:
                 f.write(component.code)
             
             print(f"  Saved: {path}")

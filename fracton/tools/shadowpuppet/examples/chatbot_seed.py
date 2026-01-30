@@ -354,15 +354,29 @@ def test_chatbot_returns_response(chatbot):
 
 def run_evolution():
     """Run ShadowPuppet evolution on this architecture."""
+    import os
     from fracton.tools.shadowpuppet import (
         SoftwareEvolution,
         ProtocolSpec,
         GrowthGap,
         EvolutionConfig,
-        MockGenerator,
         TestSuite
     )
+    from fracton.tools.shadowpuppet.generators import (
+        ClaudeGenerator,
+        MockGenerator
+    )
     from pathlib import Path
+    
+    # Load API key from grimm/.env if not set
+    if not os.environ.get('ANTHROPIC_API_KEY'):
+        env_path = Path(__file__).parents[5] / 'grimm' / '.env'
+        if env_path.exists():
+            for line in env_path.read_text().splitlines():
+                if line.startswith('ANTHROPIC_API_KEY='):
+                    os.environ['ANTHROPIC_API_KEY'] = line.split('=', 1)[1].strip()
+                    print(f"[*] Loaded API key from {env_path}")
+                    break
     
     # Define protocols with explicit dependencies
     protocols = [
@@ -441,9 +455,20 @@ def run_evolution():
         output_dir=Path("chatbot_evolution")
     )
     
+    # Select generator based on API key availability
+    if not os.environ.get('ANTHROPIC_API_KEY'):
+        print("[!] ANTHROPIC_API_KEY not set, using MockGenerator")
+        generator = MockGenerator()
+    else:
+        generator = ClaudeGenerator(
+            model="claude-sonnet-4-20250514",
+            temperature=0.3,
+            fallback_generator=MockGenerator()
+        )
+    
     # Run evolution
     evolution = SoftwareEvolution(
-        generator=MockGenerator(),
+        generator=generator,
         config=config,
         pac_invariants=WORLDSEED_METADATA['pac_invariants']
     )
