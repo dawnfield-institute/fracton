@@ -240,3 +240,7 @@ temp_*.py
 # Docker volumes and runtime data
 docker-data/
 .docker/
+
+# ShadowPuppet generated output
+*_generated/
+*_evolution/

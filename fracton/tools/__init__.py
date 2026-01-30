@@ -1,9 +1,14 @@
 """
-Fracton Tools Package - Tool expression framework (placeholder)
+Fracton Tools Package
 
-This module will provide the tool expression framework for external system
-integration. Currently implemented as a stub for the core language development.
+Provides:
+- Tool expression framework for external system integration
+- ShadowPuppet: Architecture-as-code evolution framework
 """
+
+# ShadowPuppet - Architecture-as-Code Evolution
+from . import shadowpuppet
+
 
 class ToolRegistry:
     """Placeholder tool registry."""
