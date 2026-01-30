@@ -353,7 +353,14 @@ Reply with ONLY a number between 0.0 and 1.0."""
                                         if target.value.id == 'self':
                                             init_attrs.add(target.attr)
                         
-                        expected_attrs = set(protocol.attributes)
+                        # Parse expected attributes (handle "name: Type" format)
+                        expected_attrs = set()
+                        for attr in protocol.attributes:
+                            if ':' in attr:
+                                expected_attrs.add(attr.split(':')[0].strip())
+                            else:
+                                expected_attrs.add(attr.strip())
+                        
                         if expected_attrs:
                             attr_ratio = len(init_attrs & expected_attrs) / len(expected_attrs)
                             score += 0.2 * attr_ratio
@@ -523,12 +530,19 @@ Reply with ONLY a number between 0.0 and 1.0."""
         if not test_functions:
             return 0.5
         
+        # Try to instantiate the component
+        instance = self._get_component_instance(component)
+        if instance is None:
+            # Can't instantiate - partial credit for valid syntax
+            return 0.3
+        
         passed = 0
         total = len(test_functions)
         
         for test_fn in test_functions:
             try:
-                result = test_fn(component, context)
+                # Pass the instance to the test function
+                result = test_fn(instance)
                 if result:
                     passed += 1
             except Exception as e:
@@ -540,16 +554,61 @@ Reply with ONLY a number between 0.0 and 1.0."""
         
         return passed / total if total > 0 else 0.5
     
+    def _get_component_instance(self, component: ComponentOrganism) -> Any:
+        """
+        Execute component code and return an instance of the class.
+        
+        Returns None if instantiation fails.
+        """
+        try:
+            # Create namespace for execution
+            import uuid
+            from datetime import datetime
+            from dataclasses import dataclass, field
+            from typing import Dict, List, Any, Optional
+            
+            namespace = {
+                'uuid': uuid,
+                'datetime': datetime,
+                'dataclass': dataclass,
+                'field': field,
+                'Dict': Dict,
+                'List': List,
+                'Any': Any,
+                'Optional': Optional,
+            }
+            
+            # Execute the code
+            exec(component.code, namespace)
+            
+            # Find the class with matching protocol name
+            if component.protocol_name in namespace:
+                cls = namespace[component.protocol_name]
+                # Try to instantiate
+                return cls()
+            
+            # Fallback: find any class
+            for name, obj in namespace.items():
+                if isinstance(obj, type) and not name.startswith('_'):
+                    try:
+                        return obj()
+                    except:
+                        continue
+            
+            return None
+        except Exception:
+            return None
+    
     def _get_generation_weights(self, generation: int) -> Dict[str, float]:
         """
         Get fitness weights based on generation.
         
-        Early (0-2): Prioritize coherence (filter garbage)
+        Early (0-2): Prioritize coherence heavily (filter garbage, allow survival)
         Mid (3-9): Balanced
         Late (10+): Prioritize tests (optimization)
         """
         if generation < 3:
-            return {'coherence': 0.7, 'tests': 0.3}
+            return {'coherence': 0.85, 'tests': 0.15}  # Much heavier on coherence early
         elif generation < 10:
             return {'coherence': 0.5, 'tests': 0.5}
         else:
