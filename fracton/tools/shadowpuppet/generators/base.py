@@ -25,6 +25,8 @@ class GenerationContext:
         mutation_rate: How much to vary from parent (0.0-1.0)
         pac_invariants: Conservation laws to preserve
         extra_instructions: Additional generation instructions
+        domain_types: Type definitions (dataclasses, etc.) to include
+        resolved_dependencies: Already-generated dependencies for this protocol
     """
     protocol: ProtocolSpec
     parent: Optional[ComponentOrganism] = None
@@ -32,12 +34,18 @@ class GenerationContext:
     mutation_rate: float = 0.1
     pac_invariants: List[str] = None
     extra_instructions: str = ""
+    domain_types: List[str] = None  # Source code of domain type definitions
+    resolved_dependencies: Dict[str, 'ComponentOrganism'] = None  # name -> component
     
     def __post_init__(self):
         if self.siblings is None:
             self.siblings = []
         if self.pac_invariants is None:
             self.pac_invariants = []
+        if self.domain_types is None:
+            self.domain_types = []
+        if self.resolved_dependencies is None:
+            self.resolved_dependencies = {}
 
 
 class CodeGenerator(ABC):
@@ -82,6 +90,22 @@ class CodeGenerator(ABC):
         or use directly. Implements template-guided prompting.
         """
         parts = []
+        
+        # Domain types first (so generator knows the data structures)
+        if context.domain_types:
+            parts.append("DOMAIN TYPES (use these in your implementation):")
+            for type_def in context.domain_types:
+                parts.append(f"```python\n{type_def}\n```")
+            parts.append("")
+        
+        # Resolved dependencies (already-generated components this depends on)
+        if context.resolved_dependencies:
+            parts.append("DEPENDENCIES (your implementation should use these):")
+            for name, component in context.resolved_dependencies.items():
+                parts.append(f"- {name}: already implemented, available for use")
+                # Show interface summary, not full code
+                parts.append(f"  Methods available: {component.protocol_name}")
+            parts.append("")
         
         # Protocol specification
         parts.append("Implement this Python class:\n")

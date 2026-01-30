@@ -56,7 +56,8 @@ from .generators import (
     CodeGenerator,
     CopilotGenerator,
     ClaudeGenerator,
-    MockGenerator
+    MockGenerator,
+    GenerationContext
 )
 
 __all__ = [
@@ -83,6 +84,7 @@ __all__ = [
     'CopilotGenerator',
     'ClaudeGenerator',
     'MockGenerator',
+    'GenerationContext',
 ]
 
-__version__ = '0.2.0'
+__version__ = '0.3.0'

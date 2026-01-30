@@ -176,11 +176,17 @@ class SoftwareEvolution:
         """
         max_gens = max_generations or self.config.max_generations
         
+        # Sort gaps by dependency order (dependencies first)
+        ordered_gaps = self._order_by_dependencies(gaps)
+        
         print(f"\n[ShadowPuppet] Starting evolution")
         print(f"  Generator: {self.generator.name}")
-        print(f"  Gaps: {len(gaps)}")
+        print(f"  Gaps: {len(ordered_gaps)}")
         print(f"  Max generations: {max_gens}")
         print(f"  Coherence threshold: {self.config.coherence_threshold}")
+        
+        if ordered_gaps != gaps:
+            print(f"  Dependency order: {[g.protocol.name for g in ordered_gaps]}")
         
         for gen in range(max_gens):
             self.generation = gen
@@ -192,7 +198,7 @@ class SoftwareEvolution:
             # BIRTH: Generate components for gaps
             new_components = []
             
-            for gap in gaps:
+            for gap in ordered_gaps:
                 if len(self.components) + len(new_components) >= self.config.max_population:
                     print(f"  [!] Population limit reached")
                     break
@@ -235,6 +241,10 @@ class SoftwareEvolution:
                             1.0 + 0.3 * (idx / max(1, self.config.candidates_per_gap - 1))
                         )
                         
+                        # Get resolved dependencies (components for dependencies)
+                        all_so_far = self.components + new_components
+                        resolved_deps = self._get_resolved_dependencies(gap, all_so_far)
+                        
                         # Build generation context
                         from .generators.base import GenerationContext
                         gen_context = GenerationContext(
@@ -242,7 +252,9 @@ class SoftwareEvolution:
                             parent=parent,
                             siblings=[c for c in self.components if c.protocol_name != gap.protocol.name][:2],
                             mutation_rate=mutation_variation,
-                            pac_invariants=self.env.pac_invariants + gap.protocol.pac_invariants
+                            pac_invariants=self.env.pac_invariants + gap.protocol.pac_invariants,
+                            domain_types=gap.domain_types,
+                            resolved_dependencies=resolved_deps
                         )
                         
                         # Generate code
@@ -640,3 +652,75 @@ Return the complete corrected implementation."""
                 f.write(component.code)
             
             print(f"  Saved: {path}")
+    
+    def _order_by_dependencies(self, gaps: List[GrowthGap]) -> List[GrowthGap]:
+        """
+        Topologically sort gaps so dependencies are generated first.
+        
+        Uses Kahn's algorithm for topological sort.
+        
+        Args:
+            gaps: List of gaps to sort
+            
+        Returns:
+            Sorted list with dependencies before dependents
+        """
+        # Build dependency graph
+        gap_by_name = {g.protocol.name: g for g in gaps}
+        all_names = set(gap_by_name.keys())
+        
+        # Count incoming edges (dependencies within our gap set)
+        in_degree = {name: 0 for name in all_names}
+        for gap in gaps:
+            for dep in gap.protocol.dependencies:
+                if dep in all_names:
+                    in_degree[gap.protocol.name] += 1
+        
+        # Start with gaps that have no dependencies (in our set)
+        queue = [name for name, degree in in_degree.items() if degree == 0]
+        result = []
+        
+        while queue:
+            name = queue.pop(0)
+            result.append(gap_by_name[name])
+            
+            # Reduce in-degree for dependents
+            for gap in gaps:
+                if name in gap.protocol.dependencies:
+                    in_degree[gap.protocol.name] -= 1
+                    if in_degree[gap.protocol.name] == 0:
+                        queue.append(gap.protocol.name)
+        
+        # If we couldn't order all gaps (cycle), return original order
+        if len(result) != len(gaps):
+            print(f"  [!] Dependency cycle detected, using original order")
+            return gaps
+        
+        return result
+    
+    def _get_resolved_dependencies(
+        self,
+        gap: GrowthGap,
+        all_components: List[ComponentOrganism]
+    ) -> Dict[str, ComponentOrganism]:
+        """
+        Get already-generated components that this gap depends on.
+        
+        Args:
+            gap: The gap being filled
+            all_components: All generated components so far
+            
+        Returns:
+            Dict mapping dependency name to best component
+        """
+        resolved = {}
+        for dep_name in gap.protocol.dependencies:
+            # Find best component for this dependency
+            dep_components = [
+                c for c in all_components 
+                if c.protocol_name == dep_name
+            ]
+            if dep_components:
+                best = max(dep_components, key=lambda c: c.coherence_score)
+                resolved[dep_name] = best
+        return resolved
