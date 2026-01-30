@@ -171,6 +171,7 @@ class GrowthGap:
         priority: Higher priority gaps are filled first
         test_suite: Tests to validate generated code
         context: Additional context for generation
+        domain_types: Source code of domain type definitions to include
     """
     protocol: ProtocolSpec
     parent_components: List['ComponentOrganism'] = field(default_factory=list)
@@ -178,6 +179,7 @@ class GrowthGap:
     priority: float = 1.0
     test_suite: Optional[TestSuite] = None
     context: Dict[str, Any] = field(default_factory=dict)
+    domain_types: List[str] = field(default_factory=list)  # Type definition source code
     
     def get_test_dict(self) -> Dict[str, List[Callable]]:
         """Get test suite as dictionary."""

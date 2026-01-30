@@ -376,3 +376,214 @@ class TestGenerationStats:
         assert stats.mean_coherence == 0.75
         assert stats.best_component_id == "Best_5"
         assert stats.timestamp is not None
+
+
+class TestDependencyOrdering:
+    """Tests for dependency-based gap ordering."""
+    
+    @pytest.fixture
+    def evolution(self):
+        return SoftwareEvolution(
+            generator=MockGenerator(),
+            config=EvolutionConfig(
+                coherence_threshold=0.50,
+                max_generations=1,
+                candidates_per_gap=1
+            )
+        )
+    
+    def test_order_by_dependencies_simple(self, evolution):
+        """Test that dependencies are ordered correctly."""
+        # B depends on A
+        proto_a = ProtocolSpec(name="A", methods=["a"], docstring="A", dependencies=[])
+        proto_b = ProtocolSpec(name="B", methods=["b"], docstring="B", dependencies=["A"])
+        
+        gaps = [
+            GrowthGap(protocol=proto_b),  # Put dependent first
+            GrowthGap(protocol=proto_a)
+        ]
+        
+        ordered = evolution._order_by_dependencies(gaps)
+        
+        # A should come before B
+        names = [g.protocol.name for g in ordered]
+        assert names.index("A") < names.index("B")
+    
+    def test_order_by_dependencies_chain(self, evolution):
+        """Test ordering with dependency chain."""
+        # C -> B -> A
+        proto_a = ProtocolSpec(name="A", methods=[], docstring="A", dependencies=[])
+        proto_b = ProtocolSpec(name="B", methods=[], docstring="B", dependencies=["A"])
+        proto_c = ProtocolSpec(name="C", methods=[], docstring="C", dependencies=["B"])
+        
+        gaps = [
+            GrowthGap(protocol=proto_c),
+            GrowthGap(protocol=proto_a),
+            GrowthGap(protocol=proto_b)
+        ]
+        
+        ordered = evolution._order_by_dependencies(gaps)
+        names = [g.protocol.name for g in ordered]
+        
+        assert names.index("A") < names.index("B")
+        assert names.index("B") < names.index("C")
+    
+    def test_order_by_dependencies_multiple(self, evolution):
+        """Test ordering with multiple dependencies."""
+        # D depends on A, B, C
+        proto_a = ProtocolSpec(name="A", methods=[], docstring="A", dependencies=[])
+        proto_b = ProtocolSpec(name="B", methods=[], docstring="B", dependencies=[])
+        proto_c = ProtocolSpec(name="C", methods=[], docstring="C", dependencies=[])
+        proto_d = ProtocolSpec(name="D", methods=[], docstring="D", dependencies=["A", "B", "C"])
+        
+        gaps = [
+            GrowthGap(protocol=proto_d),
+            GrowthGap(protocol=proto_b),
+            GrowthGap(protocol=proto_a),
+            GrowthGap(protocol=proto_c)
+        ]
+        
+        ordered = evolution._order_by_dependencies(gaps)
+        names = [g.protocol.name for g in ordered]
+        
+        # D should be last
+        assert names[-1] == "D"
+    
+    def test_order_by_dependencies_external(self, evolution):
+        """Test that external dependencies don't affect ordering."""
+        # B depends on A and External (not in gaps)
+        proto_a = ProtocolSpec(name="A", methods=[], docstring="A", dependencies=[])
+        proto_b = ProtocolSpec(name="B", methods=[], docstring="B", dependencies=["A", "ExternalLib"])
+        
+        gaps = [
+            GrowthGap(protocol=proto_b),
+            GrowthGap(protocol=proto_a)
+        ]
+        
+        ordered = evolution._order_by_dependencies(gaps)
+        names = [g.protocol.name for g in ordered]
+        
+        # Should still order correctly (External is ignored)
+        assert names.index("A") < names.index("B")
+    
+    def test_resolved_dependencies(self, evolution):
+        """Test getting resolved dependencies."""
+        proto_a = ProtocolSpec(name="A", methods=[], docstring="A")
+        proto_b = ProtocolSpec(name="B", methods=[], docstring="B", dependencies=["A"])
+        
+        # Simulate A already generated
+        comp_a = ComponentOrganism(id="A_1", protocol_name="A", code="class A: pass", coherence_score=0.9)
+        evolution.components.append(comp_a)
+        
+        gap_b = GrowthGap(protocol=proto_b)
+        resolved = evolution._get_resolved_dependencies(gap_b, evolution.components)
+        
+        assert "A" in resolved
+        assert resolved["A"].id == "A_1"
+    
+    def test_grow_respects_dependency_order(self, evolution):
+        """Test that grow() generates in dependency order."""
+        # ChatBot depends on IntentClassifier
+        classifier = ProtocolSpec(
+            name="IntentClassifier", methods=["classify"], docstring="Classifier",
+            dependencies=[]
+        )
+        chatbot = ProtocolSpec(
+            name="ChatBot", methods=["chat"], docstring="Bot",
+            dependencies=["IntentClassifier"]
+        )
+        
+        gaps = [
+            GrowthGap(protocol=chatbot),  # Dependent first
+            GrowthGap(protocol=classifier)
+        ]
+        
+        evolution.grow(gaps, max_generations=1)
+        
+        # Both should be generated
+        names = {c.protocol_name for c in evolution.components}
+        assert "IntentClassifier" in names
+        assert "ChatBot" in names
+
+
+class TestDomainTypes:
+    """Tests for domain type passing."""
+    
+    @pytest.fixture
+    def evolution(self):
+        return SoftwareEvolution(
+            generator=MockGenerator(),
+            config=EvolutionConfig(max_generations=1, candidates_per_gap=1)
+        )
+    
+    def test_gap_with_domain_types(self):
+        """Test GrowthGap stores domain types."""
+        domain_types = [
+            "@dataclass\nclass User:\n    id: str\n    name: str",
+            "@dataclass\nclass Request:\n    method: str"
+        ]
+        
+        proto = ProtocolSpec(name="Service", methods=[], docstring="Service")
+        gap = GrowthGap(protocol=proto, domain_types=domain_types)
+        
+        assert len(gap.domain_types) == 2
+        assert "User" in gap.domain_types[0]
+    
+    def test_generation_context_includes_domain_types(self):
+        """Test GenerationContext receives domain types."""
+        from fracton.tools.shadowpuppet.generators.base import GenerationContext
+        
+        domain_types = ["@dataclass\nclass Entity:\n    id: str"]
+        proto = ProtocolSpec(name="Service", methods=[], docstring="Service")
+        
+        ctx = GenerationContext(
+            protocol=proto,
+            domain_types=domain_types
+        )
+        
+        assert len(ctx.domain_types) == 1
+        assert "Entity" in ctx.domain_types[0]
+    
+    def test_build_prompt_includes_domain_types(self):
+        """Test that build_prompt includes domain types."""
+        from fracton.tools.shadowpuppet.generators.base import GenerationContext
+        
+        domain_types = ["@dataclass\nclass Message:\n    content: str"]
+        proto = ProtocolSpec(name="Handler", methods=["handle"], docstring="Handler")
+        
+        ctx = GenerationContext(protocol=proto, domain_types=domain_types)
+        
+        generator = MockGenerator()
+        prompt = generator.build_prompt(ctx)
+        
+        assert "DOMAIN TYPES" in prompt
+        assert "Message" in prompt
+
+
+class TestTestSuiteIntegration:
+    """Tests for test_suite integration."""
+    
+    def test_gap_test_suite_dict(self):
+        """Test GrowthGap.get_test_dict()."""
+        from fracton.tools.shadowpuppet.protocols import TestSuite
+        
+        def test_func():
+            return True
+        
+        proto = ProtocolSpec(name="Service", methods=[], docstring="Service")
+        gap = GrowthGap(
+            protocol=proto,
+            test_suite=TestSuite(unit=[test_func])
+        )
+        
+        test_dict = gap.get_test_dict()
+        assert "unit" in test_dict
+        assert len(test_dict["unit"]) == 1
+    
+    def test_empty_test_suite(self):
+        """Test GrowthGap without test_suite."""
+        proto = ProtocolSpec(name="Service", methods=[], docstring="Service")
+        gap = GrowthGap(protocol=proto)
+        
+        test_dict = gap.get_test_dict()
+        assert test_dict == {}

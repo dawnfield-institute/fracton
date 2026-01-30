@@ -227,6 +227,128 @@ WORLDSEED_METADATA = {
 
 
 # ============================================================================
+# DOMAIN TYPE SOURCE CODE (for generators)
+# ============================================================================
+
+DOMAIN_TYPES = [
+    '''@dataclass
+class Message:
+    """A chat message."""
+    role: str  # 'user', 'assistant', 'system'
+    content: str
+    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+    metadata: Dict[str, Any] = field(default_factory=dict)''',
+    
+    '''@dataclass
+class Conversation:
+    """A conversation session."""
+    id: str
+    messages: List[Message] = field(default_factory=list)
+    context: Dict[str, Any] = field(default_factory=dict)
+    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    
+    def add_message(self, role: str, content: str) -> Message:
+        msg = Message(role=role, content=content)
+        self.messages.append(msg)
+        return msg
+    
+    def get_history(self, limit: int = 10) -> List[Message]:
+        return self.messages[-limit:]''',
+    
+    '''@dataclass
+class Intent:
+    """Detected user intent."""
+    name: str
+    confidence: float
+    entities: Dict[str, Any] = field(default_factory=dict)'''
+]
+
+
+# ============================================================================
+# TEST FUNCTIONS
+# ============================================================================
+
+def test_intent_confidence_valid(classifier):
+    """Test that classifier returns valid confidence scores."""
+    intent = classifier.classify("hello there")
+    assert 0.0 <= intent.confidence <= 1.0, f"Confidence {intent.confidence} out of range [0, 1]"
+    assert isinstance(intent.name, str), "Intent name must be string"
+    return True
+
+
+def test_intent_unknown_fallback(classifier):
+    """Test that unknown messages return 'unknown' intent."""
+    intent = classifier.classify("asdfghjkl zxcvbnm qwertyuiop")  # Gibberish
+    # Either low confidence or 'unknown' intent
+    assert intent.confidence < 0.5 or intent.name == 'unknown', \
+        "Gibberish should have low confidence or 'unknown' intent"
+    return True
+
+
+def test_response_not_empty(generator):
+    """Test that generator always returns non-empty response."""
+    from dataclasses import dataclass, field
+    
+    # Create minimal test data
+    intent = Intent(name='greeting', confidence=0.9)
+    conversation = Conversation(id='test-123')
+    
+    response = generator.generate(intent, conversation)
+    assert response, "Response should not be empty"
+    assert isinstance(response, str), "Response must be string"
+    assert len(response.strip()) > 0, "Response should have content"
+    return True
+
+
+def test_conversation_message_order(manager):
+    """Test that messages are stored in order."""
+    conv = manager.create_conversation()
+    
+    manager.add_message(conv.id, 'user', 'First message')
+    manager.add_message(conv.id, 'assistant', 'Second message')
+    manager.add_message(conv.id, 'user', 'Third message')
+    
+    retrieved = manager.get_conversation(conv.id)
+    assert len(retrieved.messages) == 3, f"Expected 3 messages, got {len(retrieved.messages)}"
+    assert retrieved.messages[0].content == 'First message', "Messages not in order"
+    assert retrieved.messages[1].content == 'Second message', "Messages not in order"
+    assert retrieved.messages[2].content == 'Third message', "Messages not in order"
+    return True
+
+
+def test_conversation_context_isolation(manager):
+    """Test that context is isolated between conversations."""
+    conv1 = manager.create_conversation()
+    conv2 = manager.create_conversation()
+    
+    manager.update_context(conv1.id, {'key': 'value1'})
+    manager.update_context(conv2.id, {'key': 'value2'})
+    
+    ctx1 = manager.get_context(conv1.id)
+    ctx2 = manager.get_context(conv2.id)
+    
+    assert ctx1.get('key') == 'value1', "Context 1 incorrect"
+    assert ctx2.get('key') == 'value2', "Context 2 incorrect"
+    return True
+
+
+def test_chatbot_returns_response(chatbot):
+    """Test that chatbot.chat returns a response."""
+    conv_id = chatbot.start_conversation()
+    response = chatbot.chat("hello", conv_id)
+    
+    assert response, "ChatBot should return a response"
+    assert isinstance(response, str), "Response must be string"
+    
+    # Check history
+    history = chatbot.get_history(conv_id)
+    assert len(history) >= 2, "History should have user message and response"
+    
+    chatbot.end_conversation(conv_id)
+    return True
+
+
+# ============================================================================
 # EVOLUTION RUNNER
 # ============================================================================
 
@@ -237,56 +359,79 @@ def run_evolution():
         ProtocolSpec,
         GrowthGap,
         EvolutionConfig,
-        MockGenerator
+        MockGenerator,
+        TestSuite
     )
     from pathlib import Path
     
-    # Define protocols
+    # Define protocols with explicit dependencies
     protocols = [
         ProtocolSpec(
             name="IntentClassifier",
             methods=["classify", "extract_entities", "train"],
             docstring="Classifies user messages into intents",
-            attributes=["intents", "threshold"],
+            attributes=["intents: List[str]", "threshold: float"],
             pac_invariants=[
                 "Confidence scores sum to 1.0",
                 "Unknown messages return 'unknown' intent"
-            ]
+            ],
+            dependencies=[]  # No dependencies
         ),
         ProtocolSpec(
             name="ResponseGenerator",
             methods=["generate", "set_template", "format_response"],
             docstring="Generates responses based on intent and context",
-            attributes=["templates", "context_window"],
+            attributes=["templates: Dict[str, List[str]]", "context_window: int"],
             pac_invariants=[
                 "Responses are never empty",
                 "Fallback for unknown intents"
-            ]
+            ],
+            dependencies=[]  # No dependencies
         ),
         ProtocolSpec(
             name="ConversationManager",
             methods=["create_conversation", "get_conversation", "add_message", "get_context", "update_context"],
             docstring="Manages conversation state and history",
-            attributes=["conversations", "max_history"],
+            attributes=["conversations: Dict[str, Conversation]", "max_history: int"],
             pac_invariants=[
                 "Conversation IDs are unique",
                 "Messages stored in order"
-            ]
+            ],
+            dependencies=[]  # No dependencies
         ),
         ProtocolSpec(
             name="ChatBot",
             methods=["chat", "start_conversation", "end_conversation", "get_history"],
             docstring="Main chatbot orchestrator",
-            attributes=["classifier", "generator", "conversation_manager", "name"],
+            attributes=["classifier: IntentClassifier", "generator: ResponseGenerator", "conversation_manager: ConversationManager", "name: str"],
             pac_invariants=[
                 "Each message gets one response",
                 "Errors return helpful messages"
-            ]
+            ],
+            dependencies=["IntentClassifier", "ResponseGenerator", "ConversationManager"]
         ),
     ]
     
-    # Create gaps
-    gaps = [GrowthGap(protocol=p) for p in protocols]
+    # Create gaps with test suites and domain types
+    gaps = []
+    for p in protocols:
+        # Select tests for this protocol
+        test_funcs = []
+        if p.name == "IntentClassifier":
+            test_funcs = [test_intent_confidence_valid, test_intent_unknown_fallback]
+        elif p.name == "ResponseGenerator":
+            test_funcs = [test_response_not_empty]
+        elif p.name == "ConversationManager":
+            test_funcs = [test_conversation_message_order, test_conversation_context_isolation]
+        elif p.name == "ChatBot":
+            test_funcs = [test_chatbot_returns_response]
+        
+        gap = GrowthGap(
+            protocol=p,
+            test_suite=TestSuite(unit=test_funcs) if test_funcs else None,
+            domain_types=DOMAIN_TYPES
+        )
+        gaps.append(gap)
     
     # Configure evolution
     config = EvolutionConfig(

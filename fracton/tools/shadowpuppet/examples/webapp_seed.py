@@ -263,6 +263,103 @@ WORLDSEED_METADATA = {
 # EVOLUTION RUNNER
 # ============================================================================
 
+# Domain type source code for generators
+DOMAIN_TYPES = [
+    '''@dataclass
+class Request:
+    """HTTP request representation."""
+    method: str  # GET, POST, PUT, DELETE
+    path: str
+    headers: Dict[str, str]
+    body: Optional[Dict[str, Any]] = None
+    query_params: Optional[Dict[str, str]] = None''',
+    
+    '''@dataclass
+class Response:
+    """HTTP response representation."""
+    status_code: int
+    headers: Dict[str, str]
+    body: Any
+    
+    @staticmethod
+    def json(data: Any, status: int = 200) -> 'Response':
+        return Response(status_code=status, headers={'Content-Type': 'application/json'}, body=data)
+    
+    @staticmethod
+    def error(message: str, status: int = 400) -> 'Response':
+        return Response.json({'error': message}, status)''',
+    
+    '''@dataclass
+class User:
+    """User entity."""
+    id: str
+    username: str
+    email: str
+    created_at: str'''
+]
+
+
+# ============================================================================
+# TEST FUNCTIONS
+# ============================================================================
+
+def test_router_returns_response(router):
+    """Test that router.handle returns Response object."""
+    request = Request(method='GET', path='/test', headers={})
+    response = router.handle(request)
+    assert isinstance(response, Response), f"Expected Response, got {type(response)}"
+    assert hasattr(response, 'status_code'), "Response must have status_code"
+    return True
+
+
+def test_router_path_params(router):
+    """Test that router handles path parameters."""
+    request = Request(method='GET', path='/users/123', headers={})
+    response = router.handle(request)
+    assert response.status_code in (200, 404), f"Unexpected status: {response.status_code}"
+    return True
+
+
+def test_user_service_crud(user_service):
+    """Test UserService CRUD operations."""
+    # Create
+    user = user_service.create_user("testuser", "test@example.com", "password123")
+    assert user.username == "testuser", "Username mismatch"
+    assert user.email == "test@example.com", "Email mismatch"
+    
+    # Read
+    retrieved = user_service.get_user(user.id)
+    assert retrieved is not None, "User not found"
+    assert retrieved.id == user.id, "User ID mismatch"
+    
+    # Update
+    updated = user_service.update_user(user.id, {"username": "newname"})
+    assert updated.username == "newname", "Update failed"
+    
+    # Delete
+    deleted = user_service.delete_user(user.id)
+    assert deleted is True, "Delete should return True"
+    assert user_service.get_user(user.id) is None, "User should be deleted"
+    
+    return True
+
+
+def test_template_escapes_html(renderer):
+    """Test that template renderer escapes HTML."""
+    escaped = renderer.escape_html("<script>alert('xss')</script>")
+    assert '<script>' not in escaped, "HTML should be escaped"
+    assert '&lt;' in escaped or '&#' in escaped, "Should use HTML entities"
+    return True
+
+
+def test_static_server_mime_types(static_server):
+    """Test static server returns correct MIME types."""
+    assert static_server.get_mime_type("test.css") == "text/css"
+    assert static_server.get_mime_type("test.js") == "application/javascript"
+    assert static_server.get_mime_type("test.html") == "text/html"
+    return True
+
+
 def run_evolution():
     """Run ShadowPuppet evolution on this architecture."""
     from fracton.tools.shadowpuppet import (
@@ -270,21 +367,23 @@ def run_evolution():
         ProtocolSpec,
         GrowthGap,
         EvolutionConfig,
-        MockGenerator
+        MockGenerator,
+        TestSuite
     )
     from pathlib import Path
     
-    # Define protocols
+    # Define protocols with dependencies
     protocols = [
         ProtocolSpec(
             name="APIRouter",
             methods=["get", "post", "put", "delete", "handle"],
             docstring="REST API router with CRUD operations",
-            attributes=["routes", "middleware"],
+            attributes=["routes: Dict[str, callable]", "middleware: List[callable]"],
             pac_invariants=[
                 "All routes return Response objects",
                 "Errors use standard HTTP status codes"
-            ]
+            ],
+            dependencies=[]  # No dependencies
         ),
         ProtocolSpec(
             name="UserService",
@@ -293,42 +392,64 @@ def run_evolution():
             pac_invariants=[
                 "User IDs are unique",
                 "Email addresses are validated"
-            ]
+            ],
+            dependencies=[]  # No dependencies
         ),
         ProtocolSpec(
             name="TemplateRenderer",
             methods=["render", "load_template", "escape_html"],
             docstring="HTML template renderer for frontend",
-            attributes=["template_dir", "cache"],
+            attributes=["template_dir: str", "cache: Dict[str, str]"],
             pac_invariants=[
                 "All output is HTML-escaped",
                 "Templates are cached"
-            ]
+            ],
+            dependencies=[]  # No dependencies
         ),
         ProtocolSpec(
             name="StaticFileServer",
             methods=["serve", "get_mime_type"],
             docstring="Static file server for frontend assets",
-            attributes=["static_dir", "mime_types"],
+            attributes=["static_dir: str", "mime_types: Dict[str, str]"],
             pac_invariants=[
                 "Only serves from static directory",
                 "Sets appropriate Content-Type"
-            ]
+            ],
+            dependencies=[]  # No dependencies
         ),
         ProtocolSpec(
             name="WebApp",
             methods=["handle_request", "start", "stop"],
             docstring="Main web application orchestrator",
-            attributes=["router", "renderer", "static_server", "user_service"],
+            attributes=["router: APIRouter", "renderer: TemplateRenderer", "static_server: StaticFileServer", "user_service: UserService"],
             pac_invariants=[
                 "All components share configuration",
                 "Errors are logged"
-            ]
+            ],
+            dependencies=["APIRouter", "UserService", "TemplateRenderer", "StaticFileServer"]
         ),
     ]
     
-    # Create gaps
-    gaps = [GrowthGap(protocol=p) for p in protocols]
+    # Create gaps with test suites and domain types
+    gaps = []
+    for p in protocols:
+        # Select tests for this protocol
+        test_funcs = []
+        if p.name == "APIRouter":
+            test_funcs = [test_router_returns_response, test_router_path_params]
+        elif p.name == "UserService":
+            test_funcs = [test_user_service_crud]
+        elif p.name == "TemplateRenderer":
+            test_funcs = [test_template_escapes_html]
+        elif p.name == "StaticFileServer":
+            test_funcs = [test_static_server_mime_types]
+        
+        gap = GrowthGap(
+            protocol=p,
+            test_suite=TestSuite(unit=test_funcs) if test_funcs else None,
+            domain_types=DOMAIN_TYPES
+        )
+        gaps.append(gap)
     
     # Configure evolution
     config = EvolutionConfig(
