@@ -47,8 +47,8 @@ Example:
 """
 
 from .protocols import ProtocolSpec, GrowthGap, ComponentOrganism, TestSuite, TypeAnnotation
-from .coherence import CoherenceEvaluator
-from .evolution import SoftwareEvolution, CodeEnvironment, EvolutionConfig
+from .coherence import CoherenceEvaluator, IntegrationEvaluator
+from .evolution import SoftwareEvolution, CodeEnvironment, EvolutionConfig, EvolutionCallbacks, GenerationStats
 from .genealogy import GenealogyTree
 
 # Generators
@@ -70,11 +70,14 @@ __all__ = [
     
     # Evaluation
     'CoherenceEvaluator',
+    'IntegrationEvaluator',
     
     # Evolution
     'SoftwareEvolution',
     'CodeEnvironment',
     'EvolutionConfig',
+    'EvolutionCallbacks',
+    'GenerationStats',
     
     # Genealogy
     'GenealogyTree',
@@ -87,4 +90,4 @@ __all__ = [
     'GenerationContext',
 ]
 
-__version__ = '0.3.0'
+__version__ = '0.4.0'

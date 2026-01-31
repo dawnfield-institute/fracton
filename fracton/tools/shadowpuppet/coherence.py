@@ -613,3 +613,275 @@ Reply with ONLY a number between 0.0 and 1.0."""
             return {'coherence': 0.5, 'tests': 0.5}
         else:
             return {'coherence': 0.3, 'tests': 0.7}
+
+
+class IntegrationEvaluator:
+    """
+    Evaluates fitness of component PAIRS, not just individuals.
+    
+    Tests how well two components work together by:
+    - Checking interface compatibility (method calls match signatures)
+    - Running integration tests between component instances
+    - Validating data flow (output types match input expectations)
+    
+    This catches integration failures that individual coherence misses.
+    
+    Example:
+        evaluator = IntegrationEvaluator()
+        
+        # Define an integration test
+        def test_user_api_integration(user_service, api_router):
+            api_router.user_service = user_service
+            response = api_router.handle_request("GET", "/users/123")
+            return response.status_code == 200
+        
+        score = evaluator.evaluate_pair(
+            user_service_component,
+            api_router_component,
+            tests=[test_user_api_integration]
+        )
+    """
+    
+    def __init__(
+        self,
+        interface_weight: float = 0.4,
+        test_weight: float = 0.6
+    ):
+        """
+        Initialize integration evaluator.
+        
+        Args:
+            interface_weight: Weight for interface compatibility score
+            test_weight: Weight for integration test results
+        """
+        self.interface_weight = interface_weight
+        self.test_weight = test_weight
+    
+    def evaluate_pair(
+        self,
+        component_a: ComponentOrganism,
+        component_b: ComponentOrganism,
+        tests: Optional[List[Callable]] = None,
+        dependency_direction: Optional[str] = None  # "a->b" or "b->a"
+    ) -> float:
+        """
+        Evaluate how well two components integrate.
+        
+        Args:
+            component_a: First component
+            component_b: Second component
+            tests: Integration test functions that take (instance_a, instance_b)
+            dependency_direction: Which component depends on which
+            
+        Returns:
+            Integration score 0.0-1.0
+        """
+        interface_score = self._evaluate_interface_compatibility(
+            component_a, component_b, dependency_direction
+        )
+        
+        if tests:
+            test_score = self._run_integration_tests(
+                component_a, component_b, tests
+            )
+        else:
+            test_score = 0.5  # Neutral if no tests
+        
+        return (
+            self.interface_weight * interface_score +
+            self.test_weight * test_score
+        )
+    
+    def evaluate_system(
+        self,
+        components: List[ComponentOrganism],
+        dependency_graph: Dict[str, List[str]],
+        integration_tests: Optional[Dict[Tuple[str, str], List[Callable]]] = None
+    ) -> Dict[str, float]:
+        """
+        Evaluate all component pairs in a system.
+        
+        Args:
+            components: All components to evaluate
+            dependency_graph: Maps component name to its dependencies
+            integration_tests: Maps (name_a, name_b) to test functions
+            
+        Returns:
+            Dict mapping "name_a<->name_b" to integration score
+        """
+        scores = {}
+        component_map = {c.protocol_name: c for c in components}
+        integration_tests = integration_tests or {}
+        
+        # Evaluate each dependency relationship
+        for name, deps in dependency_graph.items():
+            if name not in component_map:
+                continue
+            
+            for dep_name in deps:
+                if dep_name not in component_map:
+                    continue
+                
+                pair_key = f"{dep_name}<->{name}"
+                tests = integration_tests.get((dep_name, name), [])
+                
+                scores[pair_key] = self.evaluate_pair(
+                    component_map[dep_name],
+                    component_map[name],
+                    tests=tests,
+                    dependency_direction=f"{dep_name}->{name}"
+                )
+        
+        return scores
+    
+    def _evaluate_interface_compatibility(
+        self,
+        component_a: ComponentOrganism,
+        component_b: ComponentOrganism,
+        dependency_direction: Optional[str]
+    ) -> float:
+        """
+        Check if component interfaces are compatible.
+        
+        Looks for:
+        - Method calls in B that match method definitions in A
+        - Type compatibility between call args and method params
+        - Attribute access patterns
+        """
+        try:
+            tree_a = ast.parse(component_a.code)
+            tree_b = ast.parse(component_b.code)
+        except SyntaxError:
+            return 0.0
+        
+        # Extract method signatures from A
+        methods_a = self._extract_method_signatures(tree_a)
+        
+        # Extract method calls in B that might reference A
+        calls_in_b = self._extract_method_calls(tree_b)
+        
+        if not methods_a or not calls_in_b:
+            return 0.5  # Can't determine compatibility
+        
+        # Check if called methods exist in A
+        matched = 0
+        total = 0
+        
+        # Look for calls that match A's class name or common patterns
+        class_name_a = component_a.protocol_name.lower()
+        
+        for call_name, call_args in calls_in_b:
+            call_lower = call_name.lower()
+            # Check if this call could be to component A
+            if class_name_a in call_lower or any(
+                m.lower() in call_lower for m in methods_a.keys()
+            ):
+                total += 1
+                # Check if method exists
+                for method_name in methods_a:
+                    if method_name.lower() in call_lower:
+                        matched += 1
+                        break
+        
+        if total == 0:
+            return 0.6  # No cross-references found, assume OK
+        
+        return matched / total
+    
+    def _extract_method_signatures(self, tree: ast.AST) -> Dict[str, Dict]:
+        """Extract method names and their parameter info from AST."""
+        methods = {}
+        
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef):
+                for item in node.body:
+                    if isinstance(item, ast.FunctionDef):
+                        params = [
+                            arg.arg for arg in item.args.args
+                            if arg.arg != 'self'
+                        ]
+                        methods[item.name] = {
+                            'params': params,
+                            'has_return': any(
+                                isinstance(n, ast.Return) and n.value
+                                for n in ast.walk(item)
+                            )
+                        }
+        
+        return methods
+    
+    def _extract_method_calls(self, tree: ast.AST) -> List[Tuple[str, int]]:
+        """Extract method calls and argument counts from AST."""
+        calls = []
+        
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                # Get the call name
+                if isinstance(node.func, ast.Attribute):
+                    call_name = node.func.attr
+                elif isinstance(node.func, ast.Name):
+                    call_name = node.func.id
+                else:
+                    continue
+                
+                calls.append((call_name, len(node.args)))
+        
+        return calls
+    
+    def _run_integration_tests(
+        self,
+        component_a: ComponentOrganism,
+        component_b: ComponentOrganism,
+        tests: List[Callable]
+    ) -> float:
+        """Run integration tests between two component instances."""
+        if not tests:
+            return 0.5
+        
+        # Try to instantiate both components
+        instance_a = self._get_instance(component_a)
+        instance_b = self._get_instance(component_b)
+        
+        if instance_a is None or instance_b is None:
+            return 0.3  # Can't instantiate
+        
+        passed = 0
+        
+        for test_fn in tests:
+            try:
+                result = test_fn(instance_a, instance_b)
+                if result:
+                    passed += 1
+            except Exception:
+                pass  # Test failed
+        
+        return passed / len(tests)
+    
+    def _get_instance(self, component: ComponentOrganism) -> Any:
+        """Execute component code and return instance."""
+        try:
+            import uuid
+            from datetime import datetime
+            from dataclasses import dataclass, field
+            from typing import Dict, List, Any, Optional
+            
+            namespace = {
+                'uuid': uuid,
+                'datetime': datetime,
+                'dataclass': dataclass,
+                'field': field,
+                'Dict': Dict,
+                'List': List,
+                'Any': Any,
+                'Optional': Optional,
+            }
+            
+            exec(component.code, namespace)
+            
+            if component.protocol_name in namespace:
+                cls = namespace[component.protocol_name]
+                return cls()
+            
+            return None
+        except Exception:
+            return None

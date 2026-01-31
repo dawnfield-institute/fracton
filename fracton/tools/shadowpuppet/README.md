@@ -1,6 +1,6 @@
 # ShadowPuppet
 
-**Architecture-as-Code Evolution Framework** (v0.3.0)
+**Architecture-as-Code Evolution Framework** (v0.4.0)
 
 ## The Idea
 
@@ -19,49 +19,24 @@ The seed file becomes the artifact. Code becomes a derived projection — regene
 
 This is **not** "AI writes code for you." This is **tooling for the next abstraction layer** — the one that defines what it means for code to be architecturally coherent.
 
-## The Recursion
+## What's New in v0.4
 
-Who writes the specs? You can. Or AI can. Or both.
+- **Integration Fitness** — `IntegrationEvaluator` tests component *pairs*, not just individuals
+- **Checkpoint Loading** — `load_checkpoint()` resumes evolution from saved state
+- **Progress Callbacks** — `EvolutionCallbacks` protocol for real-time monitoring
+- **Task Manager Example** — Practical CLI app with JSON persistence (4 components)
 
-The insight: **the spec is the checkpoint, not the author**.
-
-```
-Vibe-coding:    AI → code → code → code  (no stable artifact)
-ShadowPuppet:   AI → SPEC → code → SPEC → code  (spec is the checkpoint)
-```
-
-In pure vibe-coding, there's no validation surface. You can't pause and inspect the architecture because there isn't one — just code calling code.
-
-ShadowPuppet creates **crystallization points**. Whether human or AI writes the `ProtocolSpec`, the spec exists as:
-- A readable, diffable artifact
-- A validation target (does implementation match?)
-- Context for the next generation (resolved_dependencies)
-- A point where you can intervene, inspect, or redirect
-
-This enables **structured recursion**: AI generates architecture, architecture constrains implementation, implementation becomes context, context informs next architecture. The loop can run autonomously, but every cycle produces a legible checkpoint.
-
-Think of DNA — not designed, but still a spec. It evolved, but it's stable, heritable, and constrains protein synthesis. ShadowPuppet makes the spec explicit so the recursion remains auditable.
-
-## The Metaphor
-
-- **Protocol** is the puppet (structure, joints, constraints)
-- **Generator** is the puppeteer (brings it to life)
-- **Shadow** is the generated code (the projection that runs)
-- **Evolution** selects better shadows (implementation improvement)
-
-## What's New in v0.3
-
-- **Dependency Ordering** — Topological sort ensures components generate in correct order
-- **Domain Types** — Pass dataclass/type definitions to generators for context
-- **Test Suites** — Attach unit tests to gaps; tests run during fitness evaluation
-- **ClaudeGenerator Integration** — All seeds now use real Claude API with MockGenerator fallback
-- **Improved Coherence Scoring** — 85/15 weighting for early generations prevents premature extinction
+### From v0.3
+- Dependency Ordering — Topological sort ensures components generate in correct order
+- Domain Types — Pass dataclass/type definitions to generators for context
+- Test Suites — Attach unit tests to gaps; tests run during fitness evaluation
+- ClaudeGenerator Integration — All seeds now use real Claude API with MockGenerator fallback
 
 ### From v0.2
-- **Rich Type Signatures** - `TypeAnnotation` for stronger method contracts
-- **Genetic Crossover** - Combine methods from high-fitness parents
-- **PAC Invariant Validation** - Hard enforcement of conservation laws
-- **Targeted Refinement** - Fix specific issues in borderline candidates
+- Rich Type Signatures - `TypeAnnotation` for stronger method contracts
+- Genetic Crossover - Combine methods from high-fitness parents
+- PAC Invariant Validation - Hard enforcement of conservation laws
+- Targeted Refinement - Fix specific issues in borderline candidates
 
 ## Quick Start
 
@@ -228,6 +203,83 @@ gap = GrowthGap(
         integration=[],  # Future: cross-component tests
         property=[]      # Future: property-based tests
     )
+)
+```
+
+### Progress Callbacks (New in v0.4)
+
+Monitor evolution progress in real-time:
+
+```python
+class MyCallbacks:
+    def on_evolution_start(self, gaps, config):
+        print(f"Starting with {len(gaps)} components")
+    
+    def on_birth(self, component, fitness):
+        print(f"Born: {component.id} (fitness={fitness:.3f})")
+    
+    def on_death(self, component, reason):
+        print(f"Died: {component.id} - {reason}")
+    
+    def on_generation_end(self, generation, stats):
+        print(f"Gen {generation}: {stats.population} alive, mean={stats.mean_coherence:.3f}")
+    
+    def on_evolution_end(self, results):
+        print(f"Done! {len(results['components'])} components survived")
+
+evolution = SoftwareEvolution(
+    generator=generator,
+    callbacks=MyCallbacks()
+)
+```
+
+### Checkpoint Loading (New in v0.4)
+
+Resume evolution from saved state:
+
+```python
+# Save checkpoints during evolution
+config = EvolutionConfig(
+    save_checkpoints=True,
+    output_dir=Path("checkpoints/")
+)
+
+evolution = SoftwareEvolution(generator=generator, config=config)
+results = evolution.grow(gaps, max_generations=5)
+
+# Later: resume from checkpoint
+evolution2 = SoftwareEvolution(generator=generator, config=config)
+evolution2.load_checkpoint(Path("checkpoints/checkpoint_gen4.json"))
+results = evolution2.grow(gaps, max_generations=5)  # Continues from gen 4
+```
+
+### Integration Fitness (New in v0.4)
+
+Evaluate component pairs, not just individuals:
+
+```python
+from fracton.tools.shadowpuppet import IntegrationEvaluator
+
+evaluator = IntegrationEvaluator()
+
+# Define integration test
+def test_store_manager(store, manager):
+    task = manager.create_task("Test")
+    return store.get(task.id) is not None
+
+# Evaluate pair
+score = evaluator.evaluate_pair(
+    store_component,
+    manager_component,
+    tests=[test_store_manager],
+    dependency_direction="TaskStore->TaskManager"
+)
+
+# Or evaluate entire system
+scores = evaluator.evaluate_system(
+    components,
+    dependency_graph={"TaskManager": ["TaskStore"], "TaskApp": ["TaskManager", "CLIRenderer"]},
+    integration_tests={("TaskStore", "TaskManager"): [test_store_manager]}
 )
 ```
 
@@ -410,6 +462,27 @@ refined = evolution.refine(component, context, ["Fix: passwords not hashed"])
 
 ## Examples
 
+### Task Manager (New in v0.4 - Real Working App!)
+
+```bash
+python -m fracton.tools.shadowpuppet.examples.task_manager_seed
+```
+
+Generates a complete CLI task manager with JSON persistence:
+- `TaskStore` - JSON file storage with atomic writes
+- `TaskManager` - Business logic with validation
+- `CLIRenderer` - ANSI colored terminal output
+- `TaskApp` - CLI argument parsing and dispatch
+
+After generation, test it:
+```bash
+cd generated/task_manager
+python run_tasks.py add "Buy groceries"
+python run_tasks.py list
+python run_tasks.py start 1
+python run_tasks.py done 1
+```
+
 ### GAIA (PAC/SEC Dynamics)
 
 ```bash
@@ -457,14 +530,19 @@ Generates:
 shadowpuppet/
 ├── __init__.py          # Public API
 ├── protocols.py         # ProtocolSpec, GrowthGap, TestSuite, ComponentOrganism
-├── coherence.py         # CoherenceEvaluator (structural, semantic, execution)
-├── evolution.py         # SoftwareEvolution engine with dependency ordering
+├── coherence.py         # CoherenceEvaluator, IntegrationEvaluator
+├── evolution.py         # SoftwareEvolution, EvolutionCallbacks, checkpoints
 ├── genealogy.py         # GenealogyTree for provenance tracking
 ├── generators/
 │   ├── base.py          # CodeGenerator protocol, GenerationContext
 │   ├── mock.py          # Template-based (no AI, for testing)
 │   ├── copilot.py       # GitHub Copilot CLI
 │   └── claude.py        # Claude API + Claude Code CLI
+└── examples/
+    ├── task_manager_seed.py  # CLI task manager (4 components) ← NEW
+    ├── gaia_seed.py          # PAC/SEC dynamics (8 components)
+    ├── webapp_seed.py        # Frontend + API (5 components)
+    └── chatbot_seed.py       # Chatbot (4 components)
 └── examples/
     ├── gaia_seed.py     # PAC/SEC dynamics (8 components)
     ├── webapp_seed.py   # Frontend + API (5 components)
@@ -526,7 +604,7 @@ class MyGenerator(CodeGenerator):
 
 - **Scale**: Works well for ~10-20 components. The n² interaction explosion means larger systems need decomposition into subsystems.
 - **Implementation patterns**: LLMs can only generate *implementation* patterns from training data (loops, classes, APIs). But that's fine — implementation is solved.
-- **Integration testing**: Currently validates components individually. Cross-component integration is a gap.
+- **Interface alignment**: Components generated independently may have minor interface mismatches — the seed runner may need light integration work.
 
 ### On "Novel Architecture"
 
@@ -536,22 +614,22 @@ Novelty lives in the protocol specs. Implementation is just plumbing.
 
 ## What's Next
 
-### v0.4 (Planned)
-- **Integration Fitness**: Evaluate component *pairs*, not just individuals
-- **Incremental Evolution**: Preserve population across runs, resume from checkpoint
+### v0.5 (Planned)
 - **Property-Based Testing**: Hypothesis integration for invariant fuzzing
 - **Multi-Objective Coherence**: Pareto frontier (fast-but-fragile vs slow-but-robust)
-
-### v0.5 (Exploratory)
 - **Subsystem Decomposition**: Automatic splitting for >20 component systems
 - **Live Refinement**: Watch mode that re-evolves on spec changes
+
+### v0.6 (Exploratory)
 - **Provenance Tracing**: When production fails, trace back through genealogy
 - **Visual Genealogy**: Graph visualization of component evolution
-
-### Research Directions
 - **Self-Modifying Seeds**: Can evolution propose spec changes?
 - **Cross-Seed Breeding**: Combine architectures from different domains
+
+### Research Directions
 - **Coherence Gradients**: Use fitness landscape topology for directed search
+- **Multi-Language Support**: Generate TypeScript, Rust, Go from same specs
+- **Distributed Evolution**: Parallelize generation across multiple API keys
 
 ## License
 

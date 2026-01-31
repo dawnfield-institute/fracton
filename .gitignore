@@ -242,5 +242,8 @@ docker-data/
 .docker/
 
 # ShadowPuppet generated output
+generated/
 *_generated/
 *_evolution/
+checkpoint_*.json
+tasks.json
