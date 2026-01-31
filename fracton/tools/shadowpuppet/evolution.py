@@ -11,6 +11,11 @@ Improvements over v1:
 - Crossover/recombination between high-fitness parents
 - Targeted refinement loop for borderline candidates
 - Better parent selection with tournament
+
+v0.4 additions:
+- Checkpoint loading for incremental evolution
+- Callback system for progress monitoring
+- Integration fitness evaluation
 """
 
 import json
@@ -19,7 +24,7 @@ import ast
 import re
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, List, Optional, Any, Type, Tuple
+from typing import Dict, List, Optional, Any, Type, Tuple, Callable, Protocol
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -28,6 +33,57 @@ from .protocols import ProtocolSpec, GrowthGap, ComponentOrganism
 from .coherence import CoherenceEvaluator
 from .genealogy import GenealogyTree
 from .generators import CodeGenerator, MockGenerator
+
+
+class EvolutionCallbacks(Protocol):
+    """
+    Protocol for evolution progress callbacks.
+    
+    Implement any subset of these methods to receive events.
+    All methods are optional - unimplemented ones will be skipped.
+    
+    Example:
+        class MyCallbacks:
+            def on_generation_start(self, generation: int, population: int):
+                print(f"Starting gen {generation} with {population} components")
+            
+            def on_birth(self, component, fitness: float):
+                print(f"Born: {component.id} (fitness={fitness:.3f})")
+        
+        evolution = SoftwareEvolution(callbacks=MyCallbacks())
+    """
+    
+    def on_evolution_start(self, gaps: List[GrowthGap], config: 'EvolutionConfig') -> None:
+        """Called when evolution begins."""
+        ...
+    
+    def on_generation_start(self, generation: int, population: int) -> None:
+        """Called at the start of each generation."""
+        ...
+    
+    def on_generation_end(self, generation: int, stats: 'GenerationStats') -> None:
+        """Called at the end of each generation with stats."""
+        ...
+    
+    def on_birth(self, component: ComponentOrganism, fitness: float) -> None:
+        """Called when a new component survives initial evaluation."""
+        ...
+    
+    def on_death(self, component: ComponentOrganism, reason: str) -> None:
+        """Called when a component fails to survive."""
+        ...
+    
+    def on_refinement(self, component: ComponentOrganism, old_fitness: float, new_fitness: float) -> None:
+        """Called when a component is refined."""
+        ...
+    
+    def on_crossover(self, parent_a: ComponentOrganism, parent_b: ComponentOrganism, child: ComponentOrganism) -> None:
+        """Called when crossover produces a child."""
+        ...
+    
+    def on_evolution_end(self, results: Dict[str, Any]) -> None:
+        """Called when evolution completes."""
+        ...
 
 
 @dataclass
@@ -47,6 +103,7 @@ class EvolutionConfig:
     enable_refinement: bool = True
     refinement_threshold: float = 0.5  # Score below which to attempt refinement
     max_refinement_attempts: int = 2
+
 
 
 @dataclass
@@ -117,6 +174,18 @@ class SoftwareEvolution:
         # Get generated code
         for component in evolution.components:
             print(component.code)
+    
+    With callbacks:
+        class MyCallbacks:
+            def on_birth(self, component, fitness):
+                print(f"New component: {component.id}")
+        
+        evolution = SoftwareEvolution(callbacks=MyCallbacks())
+    
+    Resume from checkpoint:
+        evolution = SoftwareEvolution(config=EvolutionConfig(output_dir=Path("out/")))
+        evolution.load_checkpoint(Path("out/checkpoint_gen5.json"))
+        results = evolution.grow(gaps, max_generations=5)  # Continue from gen 5
     """
     
     def __init__(
@@ -124,7 +193,8 @@ class SoftwareEvolution:
         generator: Optional[CodeGenerator] = None,
         evaluator: Optional[CoherenceEvaluator] = None,
         config: Optional[EvolutionConfig] = None,
-        pac_invariants: Optional[List[str]] = None
+        pac_invariants: Optional[List[str]] = None,
+        callbacks: Optional[EvolutionCallbacks] = None
     ):
         """
         Initialize evolution engine.
@@ -134,10 +204,12 @@ class SoftwareEvolution:
             evaluator: Coherence evaluator (default: CoherenceEvaluator)
             config: Evolution configuration
             pac_invariants: Global PAC invariants to enforce
+            callbacks: Optional callbacks for progress monitoring
         """
         self.config = config or EvolutionConfig()
         self.generator = generator or MockGenerator()
         self.evaluator = evaluator or CoherenceEvaluator()
+        self.callbacks = callbacks
         
         # Environment
         self.env = CodeEnvironment(
@@ -158,6 +230,105 @@ class SoftwareEvolution:
         # Output
         if self.config.output_dir:
             self.config.output_dir.mkdir(parents=True, exist_ok=True)
+    
+    def _emit(self, event: str, *args, **kwargs) -> None:
+        """Emit a callback event if callbacks are registered."""
+        if self.callbacks is None:
+            return
+        handler = getattr(self.callbacks, event, None)
+        if handler is not None:
+            try:
+                handler(*args, **kwargs)
+            except Exception as e:
+                print(f"  [!] Callback error in {event}: {e}")
+    
+    def load_checkpoint(self, checkpoint_path: Path) -> bool:
+        """
+        Load evolution state from a checkpoint file.
+        
+        Restores:
+        - Population (components)
+        - Generation counter
+        - History
+        - Next ID counter
+        
+        Args:
+            checkpoint_path: Path to checkpoint JSON file
+            
+        Returns:
+            True if loaded successfully, False otherwise
+            
+        Example:
+            evolution = SoftwareEvolution(config=config)
+            if evolution.load_checkpoint(Path("checkpoints/gen5.json")):
+                print(f"Resumed from generation {evolution.generation}")
+                results = evolution.grow(gaps, max_generations=5)
+        """
+        if not checkpoint_path.exists():
+            print(f"[!] Checkpoint not found: {checkpoint_path}")
+            return False
+        
+        try:
+            with open(checkpoint_path, 'r') as f:
+                data = json.load(f)
+            
+            # Restore generation
+            self.generation = data.get('generation', 0)
+            
+            # Restore components
+            self.components = []
+            for comp_data in data.get('components', []):
+                component = ComponentOrganism(
+                    id=comp_data['id'],
+                    protocol_name=comp_data['protocol_name'],
+                    code=comp_data['code'],
+                    parent_id=comp_data.get('parent_id'),
+                    generation=comp_data.get('generation', 0),
+                    coherence_score=comp_data.get('coherence_score', 0.0),
+                    structural_score=comp_data.get('structural_score', 0.0),
+                    semantic_score=comp_data.get('semantic_score', 0.0),
+                    energetic_score=comp_data.get('energetic_score', 0.0),
+                    derivation_path=comp_data.get('derivation_path', []),
+                    generator_used=comp_data.get('generator_used', 'unknown'),
+                    generation_time=comp_data.get('generation_time', 0.0),
+                    integration_energy=comp_data.get('integration_energy', 0.0),
+                    age=comp_data.get('age', 0),
+                    reuse_count=comp_data.get('reuse_count', 0)
+                )
+                self.components.append(component)
+                self.genealogy.add(component)
+            
+            # Restore history
+            self.history = []
+            for hist_data in data.get('history', []):
+                stats = GenerationStats(
+                    generation=hist_data['generation'],
+                    population=hist_data['population'],
+                    births=hist_data['births'],
+                    deaths=hist_data['deaths'],
+                    mean_coherence=hist_data['mean_coherence'],
+                    max_coherence=hist_data['max_coherence'],
+                    best_component_id=hist_data['best_component_id'],
+                    timestamp=hist_data.get('timestamp', datetime.now().isoformat())
+                )
+                self.history.append(stats)
+            
+            # Update next_id to avoid collisions
+            if self.components:
+                max_id_num = 0
+                for comp in self.components:
+                    # Extract number from ID like "UserService_5"
+                    parts = comp.id.rsplit('_', 1)
+                    if len(parts) == 2 and parts[1].isdigit():
+                        max_id_num = max(max_id_num, int(parts[1]))
+                self.next_id = max_id_num + 1
+            
+            print(f"[*] Loaded checkpoint: gen={self.generation}, population={len(self.components)}")
+            return True
+            
+        except Exception as e:
+            print(f"[!] Failed to load checkpoint: {e}")
+            return False
     
     def grow(
         self,
@@ -188,12 +359,18 @@ class SoftwareEvolution:
         if ordered_gaps != gaps:
             print(f"  Dependency order: {[g.protocol.name for g in ordered_gaps]}")
         
+        # Emit evolution start callback
+        self._emit('on_evolution_start', ordered_gaps, self.config)
+        
         for gen in range(max_gens):
             self.generation = gen
             births = 0
             deaths = 0
             
             print(f"\n--- Generation {gen} ---")
+            
+            # Emit generation start callback
+            self._emit('on_generation_start', gen, len(self.components))
             
             # BIRTH: Generate components for gaps
             new_components = []
@@ -307,6 +484,7 @@ class SoftwareEvolution:
                                 new_fitness = self.evaluator.evaluate(component, eval_context)
                                 if new_fitness > fitness:
                                     print(f"      [R] Refined: {fitness:.3f} -> {new_fitness:.3f}")
+                                    self._emit('on_refinement', component, fitness, new_fitness)
                                     fitness = new_fitness
                                     break
                     
@@ -327,6 +505,7 @@ class SoftwareEvolution:
                 
                 new_components.append(best)
                 births += 1
+                self._emit('on_birth', best, best.coherence_score)
             
             # Add to population and genealogy
             for comp in new_components:
@@ -343,6 +522,7 @@ class SoftwareEvolution:
                     survivors.append(comp)
                 else:
                     print(f"      [-] Died: {comp.id} (coherence: {comp.coherence_score:.3f})")
+                    self._emit('on_death', comp, f"coherence {comp.coherence_score:.3f} < threshold {self.env.coherence_threshold}")
                     deaths += 1
             
             self.components = survivors
@@ -350,6 +530,9 @@ class SoftwareEvolution:
             # Record stats
             stats = self._record_stats(births, deaths)
             self.history.append(stats)
+            
+            # Emit generation end callback
+            self._emit('on_generation_end', gen, stats)
             
             # Save checkpoint
             if self.config.save_checkpoints and self.config.output_dir:
@@ -367,7 +550,9 @@ class SoftwareEvolution:
                 print(f"\n  [!] Population extinct!")
                 break
         
-        return self._compile_results()
+        results = self._compile_results()
+        self._emit('on_evolution_end', results)
+        return results
     
     def _select_parent(self, gap: GrowthGap) -> Optional[ComponentOrganism]:
         """Select best component as template using tournament selection."""
