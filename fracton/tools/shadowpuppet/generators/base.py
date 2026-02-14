@@ -146,9 +146,14 @@ class CodeGenerator(ABC):
             parts.append(f"ADDITIONAL INSTRUCTIONS:\n{context.extra_instructions}")
             parts.append("")
         
-        # Final instruction
+        # Final instruction - be explicit about class naming
+        parts.append("CRITICAL REQUIREMENTS:")
+        parts.append(f"1. Your class MUST be named exactly '{context.protocol.name}' (not a Protocol, a concrete class)")
+        parts.append("2. Do NOT define a Protocol - implement the actual class with working code")
+        parts.append("3. All methods must have real implementations (no '...' or 'pass' for abstract methods)")
+        parts.append("4. Include proper docstrings, type hints, and error handling")
+        parts.append("")
         parts.append("Return ONLY the complete implementation in Python.")
-        parts.append("Include proper docstrings, type hints, and error handling.")
         
         return '\n'.join(parts)
     

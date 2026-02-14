@@ -1,12 +1,12 @@
 # ShadowPuppet
 
-**Architecture-as-Code Evolution Framework** (v0.4.0)
+**Architecture-as-Code Evolution Framework** (v0.6.0-dev)
 
 ## The Idea
 
 Code generation is solved. Architecture isn't.
 
-LLMs can write functions, classes, even small systems. But they hit a wall at **architecture**.. the exponential explosion of interactions between components, the judgment calls about where to draw boundaries, the invariants that must hold across an entire system.
+LLMs can write functions, classes, even small systems. But they hit a wall at **architecture** - the exponential explosion of interactions between components, the judgment calls about where to draw boundaries, the invariants that must hold across an entire system.
 
 ShadowPuppet doesn't try to solve architecture. It provides a **process for navigating architectural space**:
 
@@ -19,12 +19,25 @@ The seed file becomes the artifact. Code becomes a derived projection — regene
 
 This is **not** "AI writes code for you." This is **tooling for the next abstraction layer** — the one that defines what it means for code to be architecturally coherent.
 
-## What's New in v0.4
+## What's New in v0.6
 
-- **Integration Fitness** — `IntegrationEvaluator` tests component *pairs*, not just individuals
-- **Checkpoint Loading** — `load_checkpoint()` resumes evolution from saved state
-- **Progress Callbacks** — `EvolutionCallbacks` protocol for real-time monitoring
-- **Task Manager Example** — Practical CLI app with JSON persistence (4 components)
+- **Multi-Seed Architectures** — Evolve multiple services/bounded contexts with explicit contracts
+- **Cross-Seed Dependencies** — Services can depend on interfaces exposed by other services
+- **Seed-Level Connectors** — Public interface contracts between seeds (like service mesh)
+- **Integration Tests** — Tests that span multiple seeds for end-to-end validation
+- **Topological Evolution** — Seeds evolve in dependency order (foundations first)
+
+### From v0.5
+- **Connectors** — Explicit interface contracts between provider and consumer components
+- **Interface Extraction** — Automatically extracts actual method signatures from generated code
+- **Call Validation** — Validates consumer code calls match provider interfaces exactly
+- **Interface-Aware Generation** — Consumers receive exact dependency signatures in prompts
+
+### From v0.4
+- Integration Fitness — `IntegrationEvaluator` tests component *pairs*, not just individuals
+- Checkpoint Loading — `load_checkpoint()` resumes evolution from saved state
+- Progress Callbacks — `EvolutionCallbacks` protocol for real-time monitoring
+- Task Manager Example — Practical CLI app with JSON persistence (4 components)
 
 ### From v0.3
 - Dependency Ordering — Topological sort ensures components generate in correct order
@@ -39,6 +52,8 @@ This is **not** "AI writes code for you." This is **tooling for the next abstrac
 - Targeted Refinement - Fix specific issues in borderline candidates
 
 ## Quick Start
+
+### Single-Seed Evolution
 
 ```python
 from fracton.tools.shadowpuppet import (
@@ -127,6 +142,84 @@ for component in evolution.components:
 # Save generated code
 evolution.save_code(Path("generated/"))
 ```
+
+### Multi-Seed Evolution (New in v0.6)
+
+Evolve multiple services/bounded contexts with explicit contracts:
+
+```python
+from fracton.tools.shadowpuppet import (
+    SeedArchitecture,
+    MultiSeedEvolution,
+    ProtocolSpec,
+    GrowthGap,
+    EvolutionConfig
+)
+
+# Define UserService seed (foundational - no dependencies)
+user_repo = ProtocolSpec(
+    name="UserRepository",
+    methods=["create_user", "get_user", "delete_user"],
+    docstring="User persistence",
+    pac_invariants=["User IDs are unique"],
+    dependencies=[]
+)
+
+user_seed = SeedArchitecture(
+    name="UserService",
+    gaps=[GrowthGap(protocol=user_repo)],
+    exposed_interfaces=["UserRepository"],  # Public API
+    dependencies={}
+)
+
+# Define OrderService seed (depends on UserService)
+order_repo = ProtocolSpec(
+    name="OrderRepository",
+    methods=["create_order", "get_order", "list_user_orders"],
+    docstring="Order persistence",
+    attributes=["user_repo: UserRepository"],  # External dependency
+    pac_invariants=["Orders reference valid users"],
+    dependencies=["UserRepository"]
+)
+
+order_seed = SeedArchitecture(
+    name="OrderService",
+    gaps=[GrowthGap(protocol=order_repo)],
+    exposed_interfaces=["OrderRepository"],
+    dependencies={
+        "UserService": ["UserRepository"]  # Consume UserService interface
+    }
+)
+
+# Evolve both seeds with cross-seed validation
+multi_evolution = MultiSeedEvolution(
+    seeds=[user_seed, order_seed],
+    generator=ClaudeGenerator(),
+    global_config=EvolutionConfig(coherence_threshold=0.70)
+)
+
+results = multi_evolution.evolve(
+    max_generations=10,
+    cross_seed_iterations=2  # Refine contracts twice
+)
+
+# Output structure:
+# generated/multi_seed/
+# ├── userservice/
+# │   ├── userrepository.py
+# │   └── interfaces.json
+# ├── orderservice/
+# │   ├── orderrepository.py
+# │   └── interfaces.json
+# └── connectors.json  # Cross-seed contracts
+```
+
+**Key Benefits**:
+- Each seed evolves independently (parallel-ready)
+- Explicit interface contracts prevent integration bugs
+- Topological ordering ensures dependencies exist before dependents
+- Cross-seed tests validate end-to-end workflows
+- Generated connectors document service boundaries
 
 ## Key Concepts
 
@@ -282,6 +375,49 @@ scores = evaluator.evaluate_system(
     integration_tests={("TaskStore", "TaskManager"): [test_store_manager]}
 )
 ```
+
+### Connectors (New in v0.5)
+
+Explicit interface contracts that enforce exact method signatures between components:
+
+```python
+from fracton.tools.shadowpuppet import ConnectorRegistry, Connector, MethodSignature
+
+# Create registry
+registry = ConnectorRegistry()
+
+# When TaskStore is generated, register its actual interface
+registry.register_provider(
+    "TaskStore",
+    task_store_component.code,
+    consumers=["TaskManager", "TaskApp"]
+)
+
+# Now when generating TaskManager, it receives exact signatures:
+context = registry.get_dependency_context("TaskManager")
+# Returns:
+# "DEPENDENCY INTERFACES (use exactly these signatures):
+#  TaskStore interface:
+#    - get(task_id: int) -> Optional[Task]
+#    - add(task: Task) -> Task
+#    - list_all() -> List[Task]
+#  IMPORTANT: Your code MUST call these methods with the exact
+#  signatures shown above. Method names and parameter types must match."
+
+# After generation, validate consumer calls match
+is_valid, violations = registry.validate_consumer("TaskManager", manager_code)
+# violations: ["Call to store.fetch() but taskstore only has: ['get', 'add']"]
+```
+
+**How it works:**
+
+1. **Extract** — When provider generates, `InterfaceExtractor` parses its AST for actual method signatures
+2. **Register** — Provider's real interface (not just the spec) is registered with consumers
+3. **Inject** — Consumer generation prompt includes exact signatures to match
+4. **Validate** — `CallValidator` checks consumer's method calls against registered interfaces
+5. **Penalize** — Interface violations reduce fitness, steering evolution toward compatibility
+
+This eliminates the "generated independently, don't quite fit together" problem.
 
 ### Dependency Resolution
 
@@ -531,6 +667,7 @@ shadowpuppet/
 ├── __init__.py          # Public API
 ├── protocols.py         # ProtocolSpec, GrowthGap, TestSuite, ComponentOrganism
 ├── coherence.py         # CoherenceEvaluator, IntegrationEvaluator
+├── connectors.py        # Connector, ConnectorRegistry, InterfaceExtractor ← NEW
 ├── evolution.py         # SoftwareEvolution, EvolutionCallbacks, checkpoints
 ├── genealogy.py         # GenealogyTree for provenance tracking
 ├── generators/
@@ -539,14 +676,10 @@ shadowpuppet/
 │   ├── copilot.py       # GitHub Copilot CLI
 │   └── claude.py        # Claude API + Claude Code CLI
 └── examples/
-    ├── task_manager_seed.py  # CLI task manager (4 components) ← NEW
+    ├── task_manager_seed.py  # CLI task manager (4 components)
     ├── gaia_seed.py          # PAC/SEC dynamics (8 components)
     ├── webapp_seed.py        # Frontend + API (5 components)
     └── chatbot_seed.py       # Chatbot (4 components)
-└── examples/
-    ├── gaia_seed.py     # PAC/SEC dynamics (8 components)
-    ├── webapp_seed.py   # Frontend + API (5 components)
-    └── chatbot_seed.py  # Chatbot (4 components)
 ```
 
 ## Theoretical Foundation
@@ -602,9 +735,8 @@ class MyGenerator(CodeGenerator):
 
 ## Limitations
 
-- **Scale**: Works well for ~10-20 components. The n² interaction explosion means larger systems need decomposition into subsystems.
+- **Scale**: Works well for ~10-20 components. The n² interaction explosion means larger systems need decomposition into subsystems (see v0.6 roadmap).
 - **Implementation patterns**: LLMs can only generate *implementation* patterns from training data (loops, classes, APIs). But that's fine — implementation is solved.
-- **Interface alignment**: Components generated independently may have minor interface mismatches — the seed runner may need light integration work.
 
 ### On "Novel Architecture"
 
@@ -614,19 +746,21 @@ Novelty lives in the protocol specs. Implementation is just plumbing.
 
 ## What's Next
 
-### v0.5 (Planned)
-- **Property-Based Testing**: Hypothesis integration for invariant fuzzing
-- **Multi-Objective Coherence**: Pareto frontier (fast-but-fragile vs slow-but-robust)
+### v0.6 (Planned)
+- **Seed Composition**: Compose multiple seeds into larger systems (auth_seed + storage_seed + api_seed)
 - **Subsystem Decomposition**: Automatic splitting for >20 component systems
-- **Live Refinement**: Watch mode that re-evolves on spec changes
+- **Seed Manifest**: Explicit imports/exports between seeds with versioning
+- **Property-Based Testing**: Hypothesis integration for invariant fuzzing
 
-### v0.6 (Exploratory)
+### v0.7 (Exploratory)
+- **Multi-Objective Coherence**: Pareto frontier (fast-but-fragile vs slow-but-robust)
+- **Live Refinement**: Watch mode that re-evolves on spec changes
 - **Provenance Tracing**: When production fails, trace back through genealogy
 - **Visual Genealogy**: Graph visualization of component evolution
-- **Self-Modifying Seeds**: Can evolution propose spec changes?
-- **Cross-Seed Breeding**: Combine architectures from different domains
 
 ### Research Directions
+- **Self-Modifying Seeds**: Can evolution propose spec changes?
+- **Cross-Seed Breeding**: Combine architectures from different domains
 - **Coherence Gradients**: Use fitness landscape topology for directed search
 - **Multi-Language Support**: Generate TypeScript, Rust, Go from same specs
 - **Distributed Evolution**: Parallelize generation across multiple API keys

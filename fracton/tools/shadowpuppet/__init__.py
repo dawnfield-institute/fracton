@@ -47,9 +47,10 @@ Example:
 """
 
 from .protocols import ProtocolSpec, GrowthGap, ComponentOrganism, TestSuite, TypeAnnotation
-from .coherence import CoherenceEvaluator, IntegrationEvaluator
+from .coherence import CoherenceEvaluator
 from .evolution import SoftwareEvolution, CodeEnvironment, EvolutionConfig, EvolutionCallbacks, GenerationStats
 from .genealogy import GenealogyTree
+from .connectors import Connector, ConnectorRegistry, MethodSignature, InterfaceExtractor
 
 # Generators
 from .generators import (
@@ -60,6 +61,15 @@ from .generators import (
     GenerationContext
 )
 
+# Multi-Seed (v0.6)
+from .multiseed import (
+    SeedArchitecture,
+    SeedInterface,
+    SeedConnector,
+    MultiSeedEvolution,
+    MultiSeedStats
+)
+
 __all__ = [
     # Core types
     'ProtocolSpec',
@@ -68,9 +78,14 @@ __all__ = [
     'TestSuite',
     'TypeAnnotation',
     
+    # Connectors
+    'Connector',
+    'ConnectorRegistry',
+    'MethodSignature',
+    'InterfaceExtractor',
+    
     # Evaluation
     'CoherenceEvaluator',
-    'IntegrationEvaluator',
     
     # Evolution
     'SoftwareEvolution',
@@ -88,6 +103,13 @@ __all__ = [
     'ClaudeGenerator',
     'MockGenerator',
     'GenerationContext',
+    
+    # Multi-Seed (v0.6)
+    'SeedArchitecture',
+    'SeedInterface',
+    'SeedConnector',
+    'MultiSeedEvolution',
+    'MultiSeedStats',
 ]
 
-__version__ = '0.4.0'
+__version__ = '0.6.0-dev'
