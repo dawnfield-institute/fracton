@@ -33,6 +33,7 @@ from .protocols import ProtocolSpec, GrowthGap, ComponentOrganism
 from .coherence import CoherenceEvaluator
 from .genealogy import GenealogyTree
 from .generators import CodeGenerator, MockGenerator
+from .connectors import ConnectorRegistry, build_connectors_from_gaps
 
 
 class EvolutionCallbacks(Protocol):
@@ -223,6 +224,9 @@ class SoftwareEvolution:
         self.genealogy = GenealogyTree()
         self.next_id = 0
         self.generation = 0
+        
+        # Connectors for interface contracts
+        self.connector_registry = ConnectorRegistry()
         
         # History
         self.history: List[GenerationStats] = []
@@ -422,8 +426,22 @@ class SoftwareEvolution:
                         all_so_far = self.components + new_components
                         resolved_deps = self._get_resolved_dependencies(gap, all_so_far)
                         
-                        # Build generation context
+                        # Build generation context with connector interfaces
                         from .generators.base import GenerationContext
+                        
+                        # Get exact interface context from connectors
+                        connector_context = self.connector_registry.get_dependency_context(
+                            gap.protocol.name
+                        )
+                        
+                        # Combine connector context with gap's extra instructions
+                        extra_instr_parts = []
+                        if connector_context:
+                            extra_instr_parts.append(connector_context)
+                        if gap.extra_instructions:
+                            extra_instr_parts.append(gap.extra_instructions)
+                        extra_instr = "\n\n".join(extra_instr_parts)
+                        
                         gen_context = GenerationContext(
                             protocol=gap.protocol,
                             parent=parent,
@@ -431,7 +449,8 @@ class SoftwareEvolution:
                             mutation_rate=mutation_variation,
                             pac_invariants=self.env.pac_invariants + gap.protocol.pac_invariants,
                             domain_types=gap.domain_types,
-                            resolved_dependencies=resolved_deps
+                            resolved_dependencies=resolved_deps,
+                            extra_instructions=extra_instr
                         )
                         
                         # Generate code
@@ -456,6 +475,15 @@ class SoftwareEvolution:
                     )
                     self.next_id += 1
                     
+                    # Validate connector interfaces before evaluation
+                    is_valid, interface_violations = self.connector_registry.validate_consumer(
+                        gap.protocol.name,
+                        code
+                    )
+                    
+                    if not is_valid:
+                        print(f"      [!] Interface violations: {interface_violations[:2]}")
+                    
                     # Evaluate fitness
                     eval_context = {
                         'protocol': gap.protocol,
@@ -463,29 +491,61 @@ class SoftwareEvolution:
                         'parents': [parent] if parent else [],
                         'generation': gen,
                         'test_suite': gap.get_test_dict(),
-                        'all_components': self.components
+                        'all_components': self.components,
+                        'interface_violations': interface_violations if not is_valid else []
                     }
                     
                     fitness = self.evaluator.evaluate(component, eval_context)
                     
+                    # Apply generation-adaptive interface penalty
+                    # Early generations: lenient (0.05 per violation)
+                    # Later generations: strict (0.15 per violation)
+                    if interface_violations:
+                        penalty_per_violation = 0.05 if gen < 2 else 0.10 if gen < 4 else 0.15
+                        interface_penalty = min(0.3, len(interface_violations) * penalty_per_violation)
+                        fitness = max(0.0, fitness - interface_penalty)
+                    
+                    component.coherence_score = fitness
+                    
                     # REFINEMENT: If score is borderline, try to fix
+                    # Include interface violations in refinement feedback
                     if (self.config.enable_refinement and 
                         fitness < self.config.refinement_threshold and
                         fitness > 0.2):  # Don't refine hopeless cases
                         
-                        violations = eval_context.get('invariant_violations', {}).get(component.id, [])
-                        if not violations:
-                            violations = [f"Low fitness: {fitness:.3f}"]
+                        # Combine invariant violations with interface violations
+                        all_violations = eval_context.get('invariant_violations', {}).get(component.id, [])
+                        all_violations.extend([f"Interface: {v}" for v in interface_violations])
+                        
+                        if not all_violations:
+                            all_violations = [f"Low fitness: {fitness:.3f}"]
                         
                         for attempt in range(self.config.max_refinement_attempts):
-                            refined_code = self.refine(component, eval_context, violations)
+                            refined_code = self.refine(component, eval_context, all_violations)
                             if refined_code:
                                 component.code = refined_code
+                                
+                                # Re-validate interfaces after refinement
+                                is_valid_now, new_violations = self.connector_registry.validate_consumer(
+                                    gap.protocol.name,
+                                    refined_code
+                                )
+                                
                                 new_fitness = self.evaluator.evaluate(component, eval_context)
+                                
+                                # Apply penalty if still has violations
+                                if new_violations:
+                                    penalty = min(0.3, len(new_violations) * penalty_per_violation)
+                                    new_fitness = max(0.0, new_fitness - penalty)
+                                
                                 if new_fitness > fitness:
                                     print(f"      [R] Refined: {fitness:.3f} -> {new_fitness:.3f}")
+                                    if is_valid_now and not is_valid:
+                                        print(f"          Fixed interface violations!")
                                     self._emit('on_refinement', component, fitness, new_fitness)
                                     fitness = new_fitness
+                                    component.coherence_score = fitness
+                                    interface_violations = new_violations
                                     break
                     
                     candidates.append(component)
@@ -506,6 +566,17 @@ class SoftwareEvolution:
                 new_components.append(best)
                 births += 1
                 self._emit('on_birth', best, best.coherence_score)
+                
+                # Register as provider for its consumers
+                consumers = [g.protocol.name for g in ordered_gaps 
+                            if best.protocol_name in g.protocol.dependencies]
+                if consumers:
+                    self.connector_registry.register_provider(
+                        best.protocol_name,
+                        best.code,
+                        consumers=consumers
+                    )
+                    print(f"      [C] Registered connector: {best.protocol_name} -> {consumers}")
             
             # Add to population and genealogy
             for comp in new_components:
@@ -710,10 +781,17 @@ class SoftwareEvolution:
         
         issues = "\n".join(f"- {v}" for v in violations[:5])  # Limit issues
         
+        # Include connector interface context for interface violations
+        connector_context = self.connector_registry.get_dependency_context(
+            component.protocol_name
+        )
+        
         refine_instructions = f"""The following code has issues that need fixing:
 
 ISSUES TO FIX:
 {issues}
+
+{connector_context if connector_context else ""}
 
 Current implementation:
 ```python
@@ -721,6 +799,7 @@ Current implementation:
 ```
 
 Fix ONLY the listed issues. Keep everything else the same.
+If there are interface violations, make sure your method calls match the exact signatures above.
 Return the complete corrected implementation."""
         
         gen_context = GenerationContext(
