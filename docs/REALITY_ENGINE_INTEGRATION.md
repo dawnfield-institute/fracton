@@ -557,7 +557,7 @@ from typing import Tuple
 
 # Import from validated PACEngine
 import sys
-sys.path.insert(0, r'c:\Users\peter\repos\Dawn Field Institute\dawn-field-theory\foundational\arithmetic\PACEngine')
+sys.path.insert(0, r'c:\Users\peter\repos\core_workspace\dawn-field-theory\foundational\arithmetic\PACEngine')
 from modules.geometric_sec import GeometricSEC as PACEngineSEC
 
 class SymbolicEntropyCollapse:
