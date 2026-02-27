@@ -48,14 +48,34 @@ fracton/
 └── examples/                   # Demo scripts
 ```
 
-## Key APIs (56 public exports)
+## API Design (v2.1: Recursion as the Mainstay)
 
-**Core**: RecursiveExecutor, ExecutionContext, PACNode, PACSystem, TieredCache
-**Decorators**: @recursive, @entropy_gate, @tool_binding, @tail_recursive
-**Physics**: klein_gordon_evolution, enforce_pac_conservation, field_pattern_matching
-**Memory**: MemoryField, PhysicsMemoryField, FieldController
-**Storage**: KronosNode, KronosEdge, KronosGraph, GeometricConfidence, FDOSerializer
-**PAC**: PACRegulator, validate_pac_conservation, enable_pac_self_regulation
+The top-level `from fracton import ...` namespace exports the **recursive core** (~30 exports). Everything else is accessed via toolkit sub-packages.
+
+### Top-level (the mainstay)
+```python
+from fracton import (
+    RecursiveExecutor, ExecutionContext, Context,
+    EntropyDispatcher, DispatchConditions, BifractalTrace, TraceAnalysis,
+    MemoryField, PhysicsMemoryField, FieldController, memory_field,
+    recursive, entropy_gate, tool_binding, tail_recursive,
+    recurse, crystallize, branch, merge_contexts,
+    PACRegulator, pac_recursive, validate_pac_conservation,
+    enable_pac_self_regulation, get_system_pac_metrics,
+)
+```
+
+### Toolkit sub-packages
+```python
+from fracton.core import PACSystem, PACNode, TieredCache, create_physics_engine
+from fracton.core.mobius_tensor import MobiusMatrix, MobiusNetwork
+from fracton.field import evolve, spherical_encode, CMBInitializer, RBFEngine
+from fracton.physics import PHI, XI, PHI_XI, LAMBDA_STAR
+from fracton.storage import KronosGraph, KronosNode, FDOSerializer
+```
+
+### Backward compatibility
+Old top-level imports (e.g., `from fracton import klein_gordon_evolution`) still work via `__getattr__` but emit `DeprecationWarning` pointing to the correct sub-module.
 
 ## Consumers
 

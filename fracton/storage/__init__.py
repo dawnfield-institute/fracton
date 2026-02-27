@@ -86,9 +86,16 @@ from .confidence import GeometricConfidence
 from .graph import KronosGraph
 from .response_generator import KronosResponseGenerator, ResponseContext
 
-# v1 Legacy (moved to legacy/v1_rag/)
-# from .kronos_backend import KronosBackend
-# from .kronos_memory import KronosMemory, PACMemoryNode, NodeType, RelationType, ResonanceResult
+# v1 Legacy (archived in legacy/v1_rag/, no longer importable)
+# KronosBackend and KronosMemory were removed in v2. Use KronosGraph instead.
+def __getattr__(name):
+    _v1_removed = {"KronosBackend", "KronosMemory"}
+    if name in _v1_removed:
+        raise ImportError(
+            f"{name} was removed in Fracton v2. "
+            f"Use KronosGraph (from fracton.storage import KronosGraph) instead."
+        )
+    raise AttributeError(f"module 'fracton.storage' has no attribute {name}")
 
 # Support components
 from .fdo_serializer import FDOSerializer
