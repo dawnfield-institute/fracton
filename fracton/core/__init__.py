@@ -23,7 +23,7 @@ from .entropy_dispatch import (
 from .bifractal_trace import BifractalTrace, TraceAnalysis
 from .memory_field import (
     MemoryField, FieldController, get_default_controller,
-    PhysicsMemoryField, physics_memory_field
+    PhysicsMemoryField, physics_memory_field, memory_field
 )
 from .pac_regulation import (
     PACRegulator, PACRecursiveContext, pac_recursive,
@@ -50,6 +50,52 @@ from .feigenbaum_mobius import (
     compute_delta_self_consistent, compute_universal_delta_z,
     prove_eigenvalue_identity, get_constants_summary,
 )
+
+def create_physics_engine(xi_target: float = 1.0571,
+                         conservation_strictness: float = 1e-12,
+                         field_dimensions: tuple = (32,),
+                         enable_pac_regulation: bool = True) -> dict:
+    """
+    Create a complete physics engine with native PAC self-regulation.
+
+    Returns a configured physics system with recursive executor,
+    entropy dispatcher, and physics memory field ready for
+    Klein-Gordon evolution and automatic PAC conservation.
+    """
+    physics_executor = PhysicsRecursiveExecutor(
+        xi_target=xi_target,
+        conservation_strictness=conservation_strictness,
+        pac_regulation=enable_pac_regulation
+    )
+
+    physics_dispatcher = PhysicsEntropyDispatcher(
+        xi_target=xi_target,
+        conservation_strictness=conservation_strictness
+    )
+
+    pac_regulator = None
+    if enable_pac_regulation:
+        pac_regulator = enable_pac_self_regulation()
+
+    physics_executor.set_physics_dispatcher(physics_dispatcher)
+
+    return {
+        'executor': physics_executor,
+        'dispatcher': physics_dispatcher,
+        'memory_field': physics_memory_field(
+            capacity=2000,
+            entropy=0.5,
+            physics_dimensions=field_dimensions,
+            conservation_strictness=conservation_strictness,
+            xi_target=xi_target
+        ),
+        'pac_regulator': pac_regulator,
+        'xi_target': xi_target,
+        'conservation_strictness': conservation_strictness,
+        'field_dimensions': field_dimensions,
+        'pac_enabled': enable_pac_regulation,
+    }
+
 
 __version__ = "2.3.0"
 __all__ = [
@@ -131,4 +177,8 @@ __all__ = [
     "compute_universal_delta_z",
     "prove_eigenvalue_identity",
     "get_constants_summary",
+
+    # Factory functions
+    "create_physics_engine",
+    "memory_field",
 ]
