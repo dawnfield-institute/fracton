@@ -1,0 +1,770 @@
+# ShadowPuppet
+
+**Architecture-as-Code Evolution Framework** (v0.6.0-dev)
+
+## The Idea
+
+Code generation is solved. Architecture isn't.
+
+LLMs can write functions, classes, even small systems. But they hit a wall at **architecture** - the exponential explosion of interactions between components, the judgment calls about where to draw boundaries, the invariants that must hold across an entire system.
+
+ShadowPuppet doesn't try to solve architecture. It provides a **process for navigating architectural space**:
+
+1. **Declare what coherence means** — Protocols, invariants, dependencies, tests
+2. **Let AI explore implementations** — Generate candidates that might satisfy those constraints
+3. **Evaluate fitness** — Structural correctness, semantic alignment, execution validity
+4. **Select survivors** — Only coherent implementations persist
+
+The seed file becomes the artifact. Code becomes a derived projection — regenerable, disposable, always consistent with the spec.
+
+This is **not** "AI writes code for you." This is **tooling for the next abstraction layer** — the one that defines what it means for code to be architecturally coherent.
+
+## What's New in v0.6
+
+- **Multi-Seed Architectures** — Evolve multiple services/bounded contexts with explicit contracts
+- **Cross-Seed Dependencies** — Services can depend on interfaces exposed by other services
+- **Seed-Level Connectors** — Public interface contracts between seeds (like service mesh)
+- **Integration Tests** — Tests that span multiple seeds for end-to-end validation
+- **Topological Evolution** — Seeds evolve in dependency order (foundations first)
+
+### From v0.5
+- **Connectors** — Explicit interface contracts between provider and consumer components
+- **Interface Extraction** — Automatically extracts actual method signatures from generated code
+- **Call Validation** — Validates consumer code calls match provider interfaces exactly
+- **Interface-Aware Generation** — Consumers receive exact dependency signatures in prompts
+
+### From v0.4
+- Integration Fitness — `IntegrationEvaluator` tests component *pairs*, not just individuals
+- Checkpoint Loading — `load_checkpoint()` resumes evolution from saved state
+- Progress Callbacks — `EvolutionCallbacks` protocol for real-time monitoring
+- Task Manager Example — Practical CLI app with JSON persistence (4 components)
+
+### From v0.3
+- Dependency Ordering — Topological sort ensures components generate in correct order
+- Domain Types — Pass dataclass/type definitions to generators for context
+- Test Suites — Attach unit tests to gaps; tests run during fitness evaluation
+- ClaudeGenerator Integration — All seeds now use real Claude API with MockGenerator fallback
+
+### From v0.2
+- Rich Type Signatures - `TypeAnnotation` for stronger method contracts
+- Genetic Crossover - Combine methods from high-fitness parents
+- PAC Invariant Validation - Hard enforcement of conservation laws
+- Targeted Refinement - Fix specific issues in borderline candidates
+
+## Quick Start
+
+### Single-Seed Evolution
+
+```python
+from fracton.tools.shadowpuppet import (
+    SoftwareEvolution,
+    ProtocolSpec,
+    GrowthGap,
+    EvolutionConfig,
+    TestSuite
+)
+from fracton.tools.shadowpuppet.generators import ClaudeGenerator, MockGenerator
+
+# Define your domain types
+DOMAIN_TYPES = [
+    '''
+@dataclass
+class User:
+    id: str
+    email: str
+    name: str
+    '''
+]
+
+# Define architecture with dependencies
+user_service = ProtocolSpec(
+    name="UserService",
+    methods=["create_user", "get_user", "update_user", "delete_user"],
+    docstring="User management with validation",
+    attributes=["users: Dict[str, User]"],
+    pac_invariants=[
+        "User IDs are unique",
+        "Emails are validated before storage"
+    ],
+    dependencies=[]  # No dependencies
+)
+
+api_router = ProtocolSpec(
+    name="APIRouter",
+    methods=["get", "post", "handle_request"],
+    docstring="REST API router",
+    attributes=["routes: Dict[str, Callable]", "user_service: UserService"],
+    pac_invariants=["All routes return Response objects"],
+    dependencies=["UserService"]  # Depends on UserService
+)
+
+# Define tests
+def test_user_crud(service):
+    user = service.create_user("test@example.com", "Test")
+    assert service.get_user(user.id) is not None
+    return True
+
+# Create gaps with tests and domain context
+gaps = [
+    GrowthGap(
+        protocol=user_service,
+        test_suite=TestSuite(unit=[test_user_crud]),
+        domain_types=DOMAIN_TYPES
+    ),
+    GrowthGap(
+        protocol=api_router,
+        domain_types=DOMAIN_TYPES
+    ),
+]
+
+# Configure evolution
+config = EvolutionConfig(
+    coherence_threshold=0.65,
+    candidates_per_gap=3,
+    max_generations=10
+)
+
+# Use Claude with MockGenerator fallback
+generator = ClaudeGenerator(
+    model="claude-sonnet-4-20250514",
+    fallback_generator=MockGenerator()
+)
+
+# Evolve!
+evolution = SoftwareEvolution(generator=generator, config=config)
+results = evolution.grow(gaps)
+
+# Components are generated in dependency order:
+# UserService first, then APIRouter (which can reference UserService)
+for component in evolution.components:
+    print(f"{component.id}: {component.coherence_score:.3f}")
+
+# Save generated code
+evolution.save_code(Path("generated/"))
+```
+
+### Multi-Seed Evolution (New in v0.6)
+
+Evolve multiple services/bounded contexts with explicit contracts:
+
+```python
+from fracton.tools.shadowpuppet import (
+    SeedArchitecture,
+    MultiSeedEvolution,
+    ProtocolSpec,
+    GrowthGap,
+    EvolutionConfig
+)
+
+# Define UserService seed (foundational - no dependencies)
+user_repo = ProtocolSpec(
+    name="UserRepository",
+    methods=["create_user", "get_user", "delete_user"],
+    docstring="User persistence",
+    pac_invariants=["User IDs are unique"],
+    dependencies=[]
+)
+
+user_seed = SeedArchitecture(
+    name="UserService",
+    gaps=[GrowthGap(protocol=user_repo)],
+    exposed_interfaces=["UserRepository"],  # Public API
+    dependencies={}
+)
+
+# Define OrderService seed (depends on UserService)
+order_repo = ProtocolSpec(
+    name="OrderRepository",
+    methods=["create_order", "get_order", "list_user_orders"],
+    docstring="Order persistence",
+    attributes=["user_repo: UserRepository"],  # External dependency
+    pac_invariants=["Orders reference valid users"],
+    dependencies=["UserRepository"]
+)
+
+order_seed = SeedArchitecture(
+    name="OrderService",
+    gaps=[GrowthGap(protocol=order_repo)],
+    exposed_interfaces=["OrderRepository"],
+    dependencies={
+        "UserService": ["UserRepository"]  # Consume UserService interface
+    }
+)
+
+# Evolve both seeds with cross-seed validation
+multi_evolution = MultiSeedEvolution(
+    seeds=[user_seed, order_seed],
+    generator=ClaudeGenerator(),
+    global_config=EvolutionConfig(coherence_threshold=0.70)
+)
+
+results = multi_evolution.evolve(
+    max_generations=10,
+    cross_seed_iterations=2  # Refine contracts twice
+)
+
+# Output structure:
+# generated/multi_seed/
+# ├── userservice/
+# │   ├── userrepository.py
+# │   └── interfaces.json
+# ├── orderservice/
+# │   ├── orderrepository.py
+# │   └── interfaces.json
+# └── connectors.json  # Cross-seed contracts
+```
+
+**Key Benefits**:
+- Each seed evolves independently (parallel-ready)
+- Explicit interface contracts prevent integration bugs
+- Topological ordering ensures dependencies exist before dependents
+- Cross-seed tests validate end-to-end workflows
+- Generated connectors document service boundaries
+
+## Key Concepts
+
+### TypeAnnotation (New in v0.2)
+
+Rich type signatures for methods:
+
+```python
+TypeAnnotation(
+    name="get_user",
+    params={"user_id": "str", "include_deleted": "bool = False"},
+    returns="Optional[User]",
+    raises=["NotFoundError", "ValidationError"],
+    async_method=False
+)
+# Generates: def get_user(self, user_id: str, include_deleted: bool = False) -> Optional[User]
+```
+
+### ProtocolSpec
+
+Defines a component's structure:
+
+```python
+ProtocolSpec(
+    name="UserService",
+    methods=["create_user", "get_user", "update_user", "delete_user"],
+    method_signatures=[...],  # Optional rich types
+    attributes=["users: Dict[str, User]", "email_index: Dict[str, str]"],
+    docstring="User management with validation",
+    pac_invariants=[
+        "User IDs are unique and immutable",
+        "Emails are validated before storage",
+        "Passwords are never stored in plaintext"  # Will be enforced!
+    ]
+)
+```
+
+### GrowthGap
+
+Identifies what needs to be generated:
+
+```python
+GrowthGap(
+    protocol=user_protocol,
+    test_suite=TestSuite(unit=[test_func1, test_func2]),  # v0.3: attached tests
+    domain_types=["@dataclass\nclass User: ..."],        # v0.3: type context
+    parent_components=[existing_component],               # Optional: context for AI
+    priority=1.0
+)
+```
+
+### TestSuite (New in v0.3)
+
+Attach tests that run during fitness evaluation:
+
+```python
+def test_user_creation(service):
+    """Test must accept instance and return bool."""
+    user = service.create_user("test@example.com", "Test User")
+    return user is not None and user.email == "test@example.com"
+
+def test_user_uniqueness(service):
+    service.create_user("dup@example.com", "First")
+    try:
+        service.create_user("dup@example.com", "Second")
+        return False  # Should have raised
+    except ValueError:
+        return True
+
+gap = GrowthGap(
+    protocol=user_protocol,
+    test_suite=TestSuite(
+        unit=[test_user_creation, test_user_uniqueness],
+        integration=[],  # Future: cross-component tests
+        property=[]      # Future: property-based tests
+    )
+)
+```
+
+### Progress Callbacks (New in v0.4)
+
+Monitor evolution progress in real-time:
+
+```python
+class MyCallbacks:
+    def on_evolution_start(self, gaps, config):
+        print(f"Starting with {len(gaps)} components")
+    
+    def on_birth(self, component, fitness):
+        print(f"Born: {component.id} (fitness={fitness:.3f})")
+    
+    def on_death(self, component, reason):
+        print(f"Died: {component.id} - {reason}")
+    
+    def on_generation_end(self, generation, stats):
+        print(f"Gen {generation}: {stats.population} alive, mean={stats.mean_coherence:.3f}")
+    
+    def on_evolution_end(self, results):
+        print(f"Done! {len(results['components'])} components survived")
+
+evolution = SoftwareEvolution(
+    generator=generator,
+    callbacks=MyCallbacks()
+)
+```
+
+### Checkpoint Loading (New in v0.4)
+
+Resume evolution from saved state:
+
+```python
+# Save checkpoints during evolution
+config = EvolutionConfig(
+    save_checkpoints=True,
+    output_dir=Path("checkpoints/")
+)
+
+evolution = SoftwareEvolution(generator=generator, config=config)
+results = evolution.grow(gaps, max_generations=5)
+
+# Later: resume from checkpoint
+evolution2 = SoftwareEvolution(generator=generator, config=config)
+evolution2.load_checkpoint(Path("checkpoints/checkpoint_gen4.json"))
+results = evolution2.grow(gaps, max_generations=5)  # Continues from gen 4
+```
+
+### Integration Fitness (New in v0.4)
+
+Evaluate component pairs, not just individuals:
+
+```python
+from fracton.tools.shadowpuppet import IntegrationEvaluator
+
+evaluator = IntegrationEvaluator()
+
+# Define integration test
+def test_store_manager(store, manager):
+    task = manager.create_task("Test")
+    return store.get(task.id) is not None
+
+# Evaluate pair
+score = evaluator.evaluate_pair(
+    store_component,
+    manager_component,
+    tests=[test_store_manager],
+    dependency_direction="TaskStore->TaskManager"
+)
+
+# Or evaluate entire system
+scores = evaluator.evaluate_system(
+    components,
+    dependency_graph={"TaskManager": ["TaskStore"], "TaskApp": ["TaskManager", "CLIRenderer"]},
+    integration_tests={("TaskStore", "TaskManager"): [test_store_manager]}
+)
+```
+
+### Connectors (New in v0.5)
+
+Explicit interface contracts that enforce exact method signatures between components:
+
+```python
+from fracton.tools.shadowpuppet import ConnectorRegistry, Connector, MethodSignature
+
+# Create registry
+registry = ConnectorRegistry()
+
+# When TaskStore is generated, register its actual interface
+registry.register_provider(
+    "TaskStore",
+    task_store_component.code,
+    consumers=["TaskManager", "TaskApp"]
+)
+
+# Now when generating TaskManager, it receives exact signatures:
+context = registry.get_dependency_context("TaskManager")
+# Returns:
+# "DEPENDENCY INTERFACES (use exactly these signatures):
+#  TaskStore interface:
+#    - get(task_id: int) -> Optional[Task]
+#    - add(task: Task) -> Task
+#    - list_all() -> List[Task]
+#  IMPORTANT: Your code MUST call these methods with the exact
+#  signatures shown above. Method names and parameter types must match."
+
+# After generation, validate consumer calls match
+is_valid, violations = registry.validate_consumer("TaskManager", manager_code)
+# violations: ["Call to store.fetch() but taskstore only has: ['get', 'add']"]
+```
+
+**How it works:**
+
+1. **Extract** — When provider generates, `InterfaceExtractor` parses its AST for actual method signatures
+2. **Register** — Provider's real interface (not just the spec) is registered with consumers
+3. **Inject** — Consumer generation prompt includes exact signatures to match
+4. **Validate** — `CallValidator` checks consumer's method calls against registered interfaces
+5. **Penalize** — Interface violations reduce fitness, steering evolution toward compatibility
+
+This eliminates the "generated independently, don't quite fit together" problem.
+
+### Dependency Resolution
+
+Components are generated in topological order based on `dependencies`:
+
+```python
+# Define dependencies
+user_service = ProtocolSpec(name="UserService", dependencies=[])
+api_router = ProtocolSpec(name="APIRouter", dependencies=["UserService"])
+webapp = ProtocolSpec(name="WebApp", dependencies=["APIRouter", "UserService"])
+
+# Evolution automatically orders: UserService → APIRouter → WebApp
+# Each component sees its dependencies' implementations during generation
+```
+
+The generator receives `resolved_dependencies` in context:
+
+```python
+context.resolved_dependencies = {
+    "UserService": <ComponentOrganism>,  # Already generated
+    "APIRouter": <ComponentOrganism>     # Already generated
+}
+```
+
+This enables components to reference real implementations, not just specs.
+
+### Generators
+
+Pluggable code generators:
+
+| Generator | Description | Requirements |
+|-----------|-------------|--------------|
+| `MockGenerator` | Template-based, no AI | None |
+| `RandomVariationGenerator` | Mock with random variation | None |
+| `CopilotGenerator` | GitHub Copilot CLI | `gh copilot` installed |
+| `ClaudeGenerator` | Claude API | `ANTHROPIC_API_KEY` |
+| `ClaudeCodeGenerator` | Claude Code CLI | `claude` CLI installed |
+
+```python
+# ClaudeGenerator with fallback
+from fracton.tools.shadowpuppet.generators import ClaudeGenerator, MockGenerator
+
+generator = ClaudeGenerator(
+    model="claude-sonnet-4-20250514",
+    temperature=0.3,           # Lower = more deterministic
+    max_tokens=4096,
+    fallback_generator=MockGenerator()  # Used if API fails
+)
+
+# ClaudeCodeGenerator (CLI-based)
+from fracton.tools.shadowpuppet.generators import ClaudeCodeGenerator
+
+generator = ClaudeCodeGenerator(
+    timeout=120,               # Generation timeout
+    fallback_generator=MockGenerator()
+)
+```
+
+### Coherence Evaluation
+
+Three-dimensional fitness scoring:
+
+- **Structural** (0-1): Type correctness, method signatures, AST validity
+- **Semantic** (0-1): Logic alignment with docstring/invariants
+- **Energetic** (0-1): Efficiency, simplicity, resource usage
+
+Combined: `fitness = (structural * semantic * energetic) ^ (1/3)`
+
+**Generation-Adaptive Weights**: Early generations use 85% coherence / 15% tests to prevent premature extinction. Later generations shift toward test-heavy evaluation.
+
+**PAC Invariant Validation** (New in v0.2):
+```python
+evaluator = CoherenceEvaluator(
+    enforce_invariants=True,  # Hard-fail on violations
+    llm_reviewer=ClaudeGenerator(),  # Optional semantic review
+    generation_adaptive=True  # Adjust weights by generation
+)
+```
+
+**Pattern-Based Invariant Checks**:
+
+| Invariant Pattern | What It Checks |
+|-------------------|----------------|
+| "JSON" + "return" | `json.dumps`, `Response.json`, `jsonify` |
+| "HTTP" + "status" | `status_code` references |
+| "unique" + "id" | `uuid`, uniqueness logic |
+| "validat*" | Validation logic, `raise`, `if not` |
+| "hash" + "password" | Password hashing patterns |
+
+### EvolutionConfig
+
+Configure the evolution process:
+
+```python
+EvolutionConfig(
+    coherence_threshold=0.70,      # Minimum fitness to survive
+    reproduction_threshold=0.80,   # Minimum to become parent
+    max_population=50,
+    candidates_per_gap=3,
+    mutation_rate=0.2,
+    max_generations=10,
+    # New in v0.2
+    enable_crossover=True,         # Genetic crossover
+    crossover_rate=0.3,            # Probability of crossover
+    enable_refinement=True,        # Targeted repair
+    refinement_threshold=0.5,      # Score to trigger refinement
+    max_refinement_attempts=2
+)
+```
+
+### Genealogy Tracking
+
+Every component tracks its full lineage:
+
+```python
+# Access genealogy after evolution
+tree = evolution.genealogy
+
+# Get derivation path (root → component)
+path = tree.get_derivation_path(component.id)
+print(f"Lineage: {' → '.join(path)}")
+
+# Get descendants
+children = tree.get_children(component.id)
+all_descendants = tree.get_descendants(component.id)
+
+# Each node tracks:
+# - component_id, protocol_name
+# - parent_id, generation
+# - coherence_score, generator_used
+# - timestamp, children
+```
+
+Useful for understanding *why* code evolved the way it did — trace failures back through ancestry.
+
+### CodeEnvironment
+
+The selection pressure mechanism:
+
+```python
+from fracton.tools.shadowpuppet import CodeEnvironment
+
+env = CodeEnvironment(
+    coherence_threshold=0.70,  # Survival threshold
+    max_population=50
+)
+
+# Check if component survives
+survives = env.check_survival(component)  # coherence >= threshold
+
+# Calculate integration energy (resources for survivors)
+energy = env.harvest_integration_energy(component)
+# Higher coherence = more energy = better reproduction chances
+```
+
+### Crossover (New in v0.2)
+
+When enabled, evolution can combine methods from two parents:
+
+```python
+# Automatic during evolution
+evolution = SoftwareEvolution(
+    config=EvolutionConfig(enable_crossover=True)
+)
+
+# Or manually
+child_code = evolution.crossover(parent_a, parent_b, protocol)
+```
+
+### Refinement (New in v0.2)
+
+Borderline candidates get targeted repair:
+
+```python
+# Automatic during evolution for scores < refinement_threshold
+# Or manually
+refined = evolution.refine(component, context, ["Fix: passwords not hashed"])
+
+## Examples
+
+### Task Manager (New in v0.4 - Real Working App!)
+
+```bash
+python -m fracton.tools.shadowpuppet.examples.task_manager_seed
+```
+
+Generates a complete CLI task manager with JSON persistence:
+- `TaskStore` - JSON file storage with atomic writes
+- `TaskManager` - Business logic with validation
+- `CLIRenderer` - ANSI colored terminal output
+- `TaskApp` - CLI argument parsing and dispatch
+
+After generation, test it:
+```bash
+cd generated/task_manager
+python run_tasks.py add "Buy groceries"
+python run_tasks.py list
+python run_tasks.py start 1
+python run_tasks.py done 1
+```
+
+### GAIA (PAC/SEC Dynamics)
+
+```bash
+python -m fracton.tools.shadowpuppet.examples.gaia_seed
+```
+
+An 8-component system modeling information-entropy dynamics:
+- `InformationField` - Information density field
+- `EntropyField` - Entropy density field  
+- `PACAggregator` - Potential-Actualization conservation
+- `BalanceOperator` - Field equilibrium (Xi constant)
+- `CollapseDetector` - SEC collapse events
+- `RecursiveLayer` - Recursive balance feedback
+- `StructureEmitter` - Structure crystallization
+- `GAIAModel` - Main orchestrator
+
+### Web Application
+
+```bash
+python -m fracton.tools.shadowpuppet.examples.webapp_seed
+```
+
+Generates:
+- `APIRouter` - REST routing with middleware
+- `UserService` - CRUD with validation
+- `TemplateRenderer` - HTML templates with escaping
+- `StaticFileServer` - Static files with MIME types
+- `WebApp` - HTTP server orchestrator
+
+### Chatbot
+
+```bash
+python -m fracton.tools.shadowpuppet.examples.chatbot_seed
+```
+
+Generates:
+- `IntentClassifier` - Intent detection with confidence
+- `ResponseGenerator` - Template-based responses
+- `ConversationManager` - Session and history management
+- `ChatBot` - Main orchestrator
+
+## Architecture
+
+```
+shadowpuppet/
+├── __init__.py          # Public API
+├── protocols.py         # ProtocolSpec, GrowthGap, TestSuite, ComponentOrganism
+├── coherence.py         # CoherenceEvaluator, IntegrationEvaluator
+├── connectors.py        # Connector, ConnectorRegistry, InterfaceExtractor ← NEW
+├── evolution.py         # SoftwareEvolution, EvolutionCallbacks, checkpoints
+├── genealogy.py         # GenealogyTree for provenance tracking
+├── generators/
+│   ├── base.py          # CodeGenerator protocol, GenerationContext
+│   ├── mock.py          # Template-based (no AI, for testing)
+│   ├── copilot.py       # GitHub Copilot CLI
+│   └── claude.py        # Claude API + Claude Code CLI
+└── examples/
+    ├── task_manager_seed.py  # CLI task manager (4 components)
+    ├── gaia_seed.py          # PAC/SEC dynamics (8 components)
+    ├── webapp_seed.py        # Frontend + API (5 components)
+    └── chatbot_seed.py       # Chatbot (4 components)
+```
+
+## Theoretical Foundation
+
+ShadowPuppet implements concepts from Dawn Field Theory:
+
+### PAC (Potential-Actualization Conservation)
+- **Potential** = Protocol specification (what could be)
+- **Actualization** = Generated code (what is)
+- **Conservation** = Coherence ensures the actualized code preserves the protocol's intent
+
+### SEC (Symbolic Entropy Collapse)
+The evolution process applies SEC dynamics:
+- **Information gradient** (∇I) = Protocol constraints that must be satisfied
+- **Entropy gradient** (∇H) = Random variation in generation
+- **Collapse boundary** = Coherence threshold where structure crystallizes
+
+High-fitness candidates represent lower entropy (more coherent structure).
+Selection pressure drives the system toward solutions that balance constraint satisfaction with implementation flexibility.
+
+### Why Evolution?
+Single-shot generation works for isolated components. But architecture involves **n² interactions** between n components. Evolution provides:
+- **Constraint propagation** — Dependencies ensure components see their dependencies' implementations
+- **Feedback loops** — Tests validate cross-component behavior
+- **Selection pressure** — Only coherent implementations survive
+
+The seed file defines the collapse boundary. Evolution finds what crystallizes within those constraints.
+
+## Custom Generators
+
+Implement the `CodeGenerator` protocol:
+
+```python
+from fracton.tools.shadowpuppet.generators import CodeGenerator, GenerationContext
+
+class MyGenerator(CodeGenerator):
+    @property
+    def name(self) -> str:
+        return "my-generator"
+    
+    def generate(self, context: GenerationContext) -> str:
+        # Available context:
+        # - context.protocol: ProtocolSpec to implement
+        # - context.domain_types: List[str] of type definitions
+        # - context.resolved_dependencies: Dict[str, ComponentOrganism]
+        # - context.parent_code: Optional parent implementation
+        # - context.temperature: Creativity parameter
+        
+        prompt = self.build_prompt(context)  # Use built-in prompt builder
+        # ... call your LLM ...
+        return self.extract_code(response)   # Extract code from response
+```
+
+## Limitations
+
+- **Scale**: Works well for ~10-20 components. The n² interaction explosion means larger systems need decomposition into subsystems (see v0.6 roadmap).
+- **Implementation patterns**: LLMs can only generate *implementation* patterns from training data (loops, classes, APIs). But that's fine — implementation is solved.
+
+### On "Novel Architecture"
+
+**The spec IS the novel architecture.** You define unprecedented architectures in seed files (like GAIA's PAC/SEC dynamics — BalanceOperator with Ξ constants, CollapseDetector watching ∇I vs ∇H — none of this exists in training data). The LLM provides implementation vocabulary, not architectural vision.
+
+Novelty lives in the protocol specs. Implementation is just plumbing.
+
+## What's Next
+
+### v0.6 (Planned)
+- **Seed Composition**: Compose multiple seeds into larger systems (auth_seed + storage_seed + api_seed)
+- **Subsystem Decomposition**: Automatic splitting for >20 component systems
+- **Seed Manifest**: Explicit imports/exports between seeds with versioning
+- **Property-Based Testing**: Hypothesis integration for invariant fuzzing
+
+### v0.7 (Exploratory)
+- **Multi-Objective Coherence**: Pareto frontier (fast-but-fragile vs slow-but-robust)
+- **Live Refinement**: Watch mode that re-evolves on spec changes
+- **Provenance Tracing**: When production fails, trace back through genealogy
+- **Visual Genealogy**: Graph visualization of component evolution
+
+### Research Directions
+- **Self-Modifying Seeds**: Can evolution propose spec changes?
+- **Cross-Seed Breeding**: Combine architectures from different domains
+- **Coherence Gradients**: Use fitness landscape topology for directed search
+- **Multi-Language Support**: Generate TypeScript, Rust, Go from same specs
+- **Distributed Evolution**: Parallelize generation across multiple API keys
+
+## License
+
+Same as Fracton - see repository root LICENSE.
