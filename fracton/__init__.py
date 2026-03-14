@@ -63,7 +63,7 @@ from .lang import (
 )
 
 # Version info
-__version__ = "2.1.0"
+__version__ = "2.0.0a1"
 __author__ = "Dawn Field Institute"
 __email__ = "info@dawnfield.org"
 
