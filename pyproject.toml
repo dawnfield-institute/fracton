@@ -4,7 +4,7 @@ build-backend = "setuptools.backends._legacy:_Backend"
 
 [project]
 name = "fracton"
-version = "2.0.0a1"
+version = "2.0.0a2"
 description = "Dawn Field Theory computational SDK — PAC/SEC/MED math, physics operators, and recursive infrastructure"
 readme = "README.md"
 license = {text = "Apache-2.0"}
