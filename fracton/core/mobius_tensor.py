@@ -31,13 +31,13 @@ Usage:
 
 from __future__ import annotations
 
-import numpy as np
-from numpy.typing import NDArray
+import math
+import torch
 from typing import Tuple, List, Optional, Union, Callable
 from dataclasses import dataclass, field
 
 # Golden ratio
-PHI = (1 + np.sqrt(5)) / 2
+PHI = (1 + math.sqrt(5)) / 2
 PHI_INV = 1 / PHI  # Also equals φ - 1
 
 
@@ -93,7 +93,8 @@ class MobiusMatrix:
         if normalize:
             det = a * d - b * c
             if abs(det) > 1e-10:
-                sqrt_det = np.sqrt(det)
+                import cmath
+                sqrt_det = cmath.sqrt(det)
                 self.a /= sqrt_det
                 self.b /= sqrt_det
                 self.c /= sqrt_det
@@ -130,7 +131,8 @@ class MobiusMatrix:
             return (self.b / (self.a - self.d), complex('inf'))
         
         discriminant = (self.d - self.a)**2 + 4 * self.b * self.c
-        sqrt_disc = np.sqrt(discriminant)
+        import cmath
+        sqrt_disc = cmath.sqrt(discriminant)
         z1 = ((self.a - self.d) + sqrt_disc) / (2 * self.c)
         z2 = ((self.a - self.d) - sqrt_disc) / (2 * self.c)
         return (z1, z2)
@@ -150,9 +152,9 @@ class MobiusMatrix:
         return self.determinant / (self.c * z + self.d)**2
     
     @property
-    def matrix(self) -> NDArray[np.complex128]:
-        """Return as numpy 2×2 matrix."""
-        return np.array([[self.a, self.b], [self.c, self.d]], dtype=np.complex128)
+    def matrix(self) -> torch.Tensor:
+        """Return as torch 2×2 matrix."""
+        return torch.tensor([[self.a, self.b], [self.c, self.d]], dtype=torch.complex128)
     
     def __repr__(self):
         return f"MobiusMatrix([[{self.a:.4f}, {self.b:.4f}], [{self.c:.4f}, {self.d:.4f}]])"
@@ -213,24 +215,24 @@ class MobiusStripTensor:
     """
     
     def __init__(self, size: int = 55, twist_factor: int = 1,
-                 dtype: np.dtype = np.complex128):
+                 dtype: torch.dtype = torch.complex128):
         self.size = size
         self.twist = twist_factor
         self.dtype = dtype
-        self._data = np.zeros(size, dtype=dtype)
-        
+        self._data = torch.zeros(size, dtype=dtype)
+
         # Phase factors for propagation
-        self.phases = np.exp(1j * np.pi * twist_factor * np.arange(size) / size)
+        self.phases = torch.exp(1j * math.pi * twist_factor * torch.arange(size, dtype=torch.float64) / size)
     
-    def __getitem__(self, idx: Union[int, slice]) -> Union[complex, NDArray]:
+    def __getitem__(self, idx: Union[int, slice]) -> Union[complex, torch.Tensor]:
         """
         Access with Möbius boundary conditions.
-        
+
         T[n+N] = (-1)^twist * T[n]
         """
         if isinstance(idx, slice):
             indices = range(*idx.indices(self.size * 2))
-            return np.array([self[i] for i in indices])
+            return torch.tensor([self[i] for i in indices], dtype=self.dtype)
         
         loops = idx // self.size
         local_idx = idx % self.size
@@ -246,60 +248,60 @@ class MobiusStripTensor:
         return self.size
     
     @property
-    def data(self) -> NDArray:
+    def data(self) -> torch.Tensor:
         """Direct access to underlying data array."""
         return self._data
     
-    def propagate(self, wave: NDArray[np.complex128], steps: int = 1) -> NDArray[np.complex128]:
+    def propagate(self, wave: torch.Tensor, steps: int = 1) -> torch.Tensor:
         """
         Propagate a wave around the Möbius strip.
-        
+
         After 'size' steps: wave has traversed once, picked up (-1)^twist phase.
         After 2*size steps: wave returns to original (4π periodicity).
-        
+
         Args:
             wave: Input wave array of length `size`
             steps: Number of propagation steps
-            
+
         Returns:
             Propagated wave array
         """
-        result = wave.copy()
+        result = wave.clone()
         for _ in range(steps):
-            result = np.roll(result, 1) * self.phases
+            result = torch.roll(result, 1) * self.phases
         return result
     
-    def standing_wave_modes(self) -> List[Tuple[int, float, NDArray[np.complex128]]]:
+    def standing_wave_modes(self) -> List[Tuple[int, float, torch.Tensor]]:
         """
         Find standing wave modes on the Möbius strip.
-        
+
         Due to antiperiodic boundary conditions, allowed momenta are:
         k = (n + 1/2) × 2π / L  for integer n
-        
+
         This is exactly spinor/fermion quantization!
-        
+
         Returns:
             List of (mode_number, momentum, wave_function) tuples
         """
         modes = []
         for n in range(self.size):
-            k = (n + 0.5) * 2 * np.pi / self.size
-            wave = np.exp(1j * k * np.arange(self.size))
-            wave = wave / np.linalg.norm(wave)  # Normalize
+            k = (n + 0.5) * 2 * math.pi / self.size
+            wave = torch.exp(1j * k * torch.arange(self.size, dtype=torch.float64))
+            wave = wave / torch.linalg.norm(wave)  # Normalize
             modes.append((n, k, wave))
         return modes
     
-    def overlap_after_loops(self, wave: NDArray[np.complex128], 
+    def overlap_after_loops(self, wave: torch.Tensor,
                             n_loops: int) -> complex:
         """
-        Compute ⟨ψ|ψ_after_n_loops⟩.
-        
+        Compute <psi|psi_after_n_loops>.
+
         For Möbius (twist=1):
         - 1 loop: overlap = -1 (sign flip)
         - 2 loops: overlap = +1 (4π periodicity)
         """
         propagated = self.propagate(wave, steps=n_loops * self.size)
-        return np.vdot(wave, propagated)
+        return torch.vdot(wave, propagated).item()
 
 
 class MobiusFibonacciTensor:
@@ -343,8 +345,9 @@ class MobiusFibonacciTensor:
     def _initialize_golden(self):
         """Initialize tensor with golden phase structure."""
         for i in range(self.size):
-            phase = 2 * np.pi * i / PHI  # Incommensurate with 2π
-            self.strip[i] = np.exp(1j * phase)
+            phase = 2 * math.pi * i / PHI  # Incommensurate with 2π
+            import cmath
+            self.strip[i] = cmath.exp(1j * phase)
     
     def golden_spiral_indices(self, n_points: int = None) -> List[int]:
         """
@@ -372,26 +375,26 @@ class MobiusFibonacciTensor:
         
         return indices
     
-    def phyllotaxis_positions(self) -> NDArray[np.float64]:
+    def phyllotaxis_positions(self) -> torch.Tensor:
         """
         Compute 2D positions using phyllotaxis (golden angle) arrangement.
-        
+
         This is how sunflowers and pinecones arrange seeds!
-        
+
         Returns:
-            Array of shape (size, 2) with x, y coordinates
+            Tensor of shape (size, 2) with x, y coordinates
         """
-        golden_angle = 2 * np.pi * PHI_INV  # ≈ 137.5°
-        
-        positions = np.zeros((self.size, 2))
+        golden_angle = 2 * math.pi * PHI_INV  # approx 137.5 degrees
+
+        positions = torch.zeros((self.size, 2))
         for n in range(self.size):
-            r = np.sqrt(n)
+            r = math.sqrt(n)
             theta = n * golden_angle
-            positions[n] = [r * np.cos(theta), r * np.sin(theta)]
-        
+            positions[n] = torch.tensor([r * math.cos(theta), r * math.sin(theta)])
+
         return positions
     
-    def standing_wave_modes(self) -> List[Tuple[int, float, NDArray[np.complex128]]]:
+    def standing_wave_modes(self) -> List[Tuple[int, float, torch.Tensor]]:
         """Delegate to underlying Möbius strip."""
         return self.strip.standing_wave_modes()
     
@@ -506,11 +509,11 @@ def verify_4pi_periodicity(size: int = 55) -> dict:
     Returns dict with verification results.
     """
     strip = MobiusStripTensor(size=size)
-    
+
     # Gaussian wave packet
-    x = np.arange(size)
-    wave = np.exp(-(x - size/2)**2 / (size/5)) + 0j
-    wave = wave / np.linalg.norm(wave)
+    x = torch.arange(size, dtype=torch.float64)
+    wave = torch.exp(-(x - size/2)**2 / (size/5)).to(torch.complex128)
+    wave = wave / torch.linalg.norm(wave)
     
     results = {
         'size': size,
@@ -562,19 +565,19 @@ class MobiusNeuron:
             self.matrix = MobiusMatrix.identity()
         elif init_type == 'near_identity':
             eps = kwargs.get('eps', 0.1)
-            a = 1 + eps * (np.random.randn() + 1j * np.random.randn())
-            b = eps * (np.random.randn() + 1j * np.random.randn())
-            c = eps * (np.random.randn() + 1j * np.random.randn())
-            d = 1 + eps * (np.random.randn() + 1j * np.random.randn())
+            a = 1 + eps * (torch.randn(1).item() + 1j * torch.randn(1).item())
+            b = eps * (torch.randn(1).item() + 1j * torch.randn(1).item())
+            c = eps * (torch.randn(1).item() + 1j * torch.randn(1).item())
+            d = 1 + eps * (torch.randn(1).item() + 1j * torch.randn(1).item())
             self.matrix = MobiusMatrix(a, b, c, d, normalize=True)
         elif init_type == 'fibonacci':
             n = kwargs.get('n', 5)
             self.matrix = MobiusMatrix.fibonacci(n)
         elif init_type == 'random':
-            a = np.random.randn() + 1j * np.random.randn()
-            b = np.random.randn() + 1j * np.random.randn()
-            c = np.random.randn() + 1j * np.random.randn()
-            d = np.random.randn() + 1j * np.random.randn()
+            a = torch.randn(1).item() + 1j * torch.randn(1).item()
+            b = torch.randn(1).item() + 1j * torch.randn(1).item()
+            c = torch.randn(1).item() + 1j * torch.randn(1).item()
+            d = torch.randn(1).item() + 1j * torch.randn(1).item()
             self.matrix = MobiusMatrix(a, b, c, d, normalize=True)
         elif init_type == 'from_matrix':
             self.matrix = kwargs['matrix']
@@ -641,18 +644,18 @@ class MobiusLayer:
             for _ in range(out_features)
         ]
     
-    def forward(self, x: NDArray[np.complexfloating]) -> NDArray[np.complexfloating]:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Forward pass.
-        
+
         Args:
-            x: Complex array of shape (in_features,)
-            
+            x: Complex tensor of shape (in_features,)
+
         Returns:
-            Complex array of shape (out_features,)
+            Complex tensor of shape (out_features,)
         """
-        output = np.zeros(self.out_features, dtype=complex)
-        
+        output = torch.zeros(self.out_features, dtype=torch.complex128)
+
         for i in range(self.out_features):
             if self.aggregation == 'compose':
                 # Compose all Möbius transforms
@@ -660,27 +663,27 @@ class MobiusLayer:
                 for j in range(self.in_features):
                     composed = self.neurons[i][j].matrix @ composed
                 # Apply to average input
-                output[i] = composed(np.mean(x))
-            
+                output[i] = composed(torch.mean(x).item())
+
             elif self.aggregation == 'average':
                 # Average of individual transforms
                 total = 0j
                 for j in range(self.in_features):
-                    total += self.neurons[i][j](x[j])
+                    total += self.neurons[i][j](x[j].item())
                 output[i] = total / self.in_features
-            
+
             elif self.aggregation == 'product':
                 # Geometric mean
                 total = 1+0j
                 for j in range(self.in_features):
-                    result = self.neurons[i][j](x[j])
-                    if np.isfinite(result):
+                    result = self.neurons[i][j](x[j].item())
+                    if math.isfinite(abs(result)):
                         total *= result
                 output[i] = total ** (1/self.in_features)
-        
+
         return output
-    
-    def __call__(self, x: NDArray[np.complexfloating]) -> NDArray[np.complexfloating]:
+
+    def __call__(self, x: torch.Tensor) -> torch.Tensor:
         return self.forward(x)
     
     def get_composed_matrix(self, output_idx: int) -> MobiusMatrix:
@@ -779,13 +782,13 @@ class MobiusNetwork:
             layer = MobiusLayer(layer_sizes[i], layer_sizes[i+1], aggregation)
             self.layers.append(layer)
     
-    def forward(self, x: NDArray[np.complexfloating]) -> NDArray[np.complexfloating]:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through all layers."""
         for layer in self.layers:
             x = layer(x)
         return x
-    
-    def __call__(self, x: NDArray[np.complexfloating]) -> NDArray[np.complexfloating]:
+
+    def __call__(self, x: torch.Tensor) -> torch.Tensor:
         return self.forward(x)
     
     @property

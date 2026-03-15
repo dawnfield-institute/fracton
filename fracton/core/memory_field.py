@@ -8,7 +8,7 @@ operations, including field isolation, snapshots, and cross-field communication.
 import time
 import uuid
 import threading
-import numpy as np
+import torch
 import copy
 import math
 from typing import Any, Dict, List, Optional, Union
@@ -928,7 +928,6 @@ class PhysicsMemoryField(MemoryField):
         
     def _init_physics_tracking(self):
         """Initialize physics state tracking."""
-        import numpy as np
         
         # Initialize default physics state
         self._physics_state = {
@@ -941,9 +940,9 @@ class PhysicsMemoryField(MemoryField):
         }
         
         # Initialize default field data
-        field_size = int(np.prod(self.physics_dimensions))
-        self._field_data = np.random.random(field_size) * 0.1
-        self._field_data = self._field_data / np.linalg.norm(self._field_data)
+        field_size = int(torch.prod(torch.tensor(self.physics_dimensions)).item())
+        self._field_data = torch.rand(field_size) * 0.1
+        self._field_data = self._field_data / torch.linalg.norm(self._field_data)
         
         self.set('physics_state', self._physics_state)
         self.set('field_data', self._field_data)
@@ -972,7 +971,6 @@ class PhysicsMemoryField(MemoryField):
                 
     def evolve_klein_gordon(self, dt: float, mass_squared: float = 0.1):
         """Evolve field using Klein-Gordon dynamics with conservation tracking."""
-        import numpy as np
         
         with self._lock:
             current_field = self.get('field_data')
@@ -980,7 +978,7 @@ class PhysicsMemoryField(MemoryField):
                 return
                 
             # Simple Klein-Gordon evolution
-            laplacian = np.zeros_like(current_field)
+            laplacian = torch.zeros_like(current_field)
             laplacian[1:-1] = current_field[2:] - 2*current_field[1:-1] + current_field[:-2]
             laplacian[0] = laplacian[1]
             laplacian[-1] = laplacian[-2]
@@ -989,16 +987,16 @@ class PhysicsMemoryField(MemoryField):
             evolved_field = current_field + dt * evolution_term
             
             # Calculate conservation metrics
-            field_norm = np.linalg.norm(evolved_field)
+            field_norm = torch.linalg.norm(evolved_field)
             field_energy = 0.5 * field_norm**2
             
             # Simplified balance operator calculation
-            grad_norm = np.linalg.norm(np.gradient(evolved_field))
+            grad_norm = torch.linalg.norm(torch.gradient(evolved_field))
             xi_current = grad_norm / field_norm if field_norm > 1e-12 else 1.0571
             xi_deviation = abs(xi_current - self.xi_target)
             
             # Conservation residual (energy conservation check)  
-            initial_energy = 0.5 * np.linalg.norm(current_field)**2
+            initial_energy = 0.5 * torch.linalg.norm(current_field)**2
             conservation_residual = abs(field_energy - initial_energy) / max(initial_energy, 1e-12)
             
             # Store updated state
@@ -1017,7 +1015,6 @@ class PhysicsMemoryField(MemoryField):
     
     def enforce_pac_conservation(self, tolerance: float = None) -> bool:
         """Enforce PAC conservation constraints on current field state."""
-        import numpy as np
         
         if tolerance is None:
             tolerance = self.conservation_strictness
@@ -1037,15 +1034,15 @@ class PhysicsMemoryField(MemoryField):
                 
             # Attempt conservation correction
             # Simple approach: renormalize field to conserve energy
-            target_norm = np.sqrt(2 * physics_state.get('field_energy', 1.0))
-            current_norm = np.linalg.norm(current_field)
+            target_norm = math.sqrt(2 * physics_state.get('field_energy', 1.0))
+            current_norm = torch.linalg.norm(current_field)
             
             if current_norm > 1e-12:
                 corrected_field = current_field * (target_norm / current_norm)
                 
                 # Recalculate metrics
-                field_energy = 0.5 * np.linalg.norm(corrected_field)**2
-                grad_norm = np.linalg.norm(np.gradient(corrected_field))
+                field_energy = 0.5 * torch.linalg.norm(corrected_field)**2
+                grad_norm = torch.linalg.norm(torch.gradient(corrected_field))
                 xi_current = grad_norm / target_norm if target_norm > 1e-12 else 1.0571
                 
                 conservation_metrics = {
@@ -1082,16 +1079,16 @@ class PhysicsMemoryField(MemoryField):
         with self._lock:
             return self._physics_state_history[-last_n:] if self._physics_state_history else []
     
-    def create_resonance_pattern(self, frequency: float, amplitude: float = 1.0) -> np.ndarray:
+    def create_resonance_pattern(self, frequency: float, amplitude: float = 1.0) -> torch.Tensor:
         """Create resonance pattern for field interaction."""
-        field_size = int(np.prod(self.physics_dimensions))
-        x = np.linspace(0, 2*np.pi, field_size)
+        field_size = int(torch.prod(torch.tensor(self.physics_dimensions)).item())
+        x = torch.linspace(0, 2*math.pi, field_size)
         
         # Create resonance pattern  
-        pattern = amplitude * np.sin(frequency * x) * np.exp(-0.1 * x)
+        pattern = amplitude * torch.sin(frequency * x) * torch.exp(-0.1 * x)
         return pattern
     
-    def apply_resonance_amplification(self, pattern: np.ndarray, 
+    def apply_resonance_amplification(self, pattern: torch.Tensor, 
                                     amplification_factor: float = None) -> bool:
         """
         Apply dynamic resonance amplification pattern to field data.
@@ -1108,33 +1105,42 @@ class PhysicsMemoryField(MemoryField):
             if amplification_factor is None:
                 # Amplification emerges from field complexity and energy state
                 field_complexity = len(current_field)
-                field_energy = 0.5 * np.linalg.norm(current_field)**2
+                field_energy = 0.5 * torch.linalg.norm(current_field)**2
                 # Dynamic factor based on system state
                 amplification_factor = max(1.0, field_complexity / field_energy) if field_energy > 0 else 1.0
             
             # Ensure pattern matches field dimensions
             if len(pattern) != len(current_field):
                 # Resize pattern to match field
-                pattern = np.interp(np.linspace(0, 1, len(current_field)),
-                                   np.linspace(0, 1, len(pattern)), pattern)
+                # Interpolate pattern to match field size
+                x_old = torch.linspace(0, 1, len(pattern))
+                x_new = torch.linspace(0, 1, len(current_field))
+                pattern_t = pattern if isinstance(pattern, torch.Tensor) else torch.tensor(pattern, dtype=torch.float64)
+                indices = torch.searchsorted(x_old, x_new).clamp(1, len(x_old) - 1)
+                x0 = x_old[indices - 1]
+                x1 = x_old[indices]
+                y0 = pattern_t[indices - 1]
+                y1 = pattern_t[indices]
+                weights = (x_new - x0) / (x1 - x0 + 1e-12)
+                pattern = y0 + weights * (y1 - y0)
             
             # Apply controlled amplification
-            original_energy = 0.5 * np.linalg.norm(current_field)**2
+            original_energy = 0.5 * torch.linalg.norm(current_field)**2
             
             # Weighted combination with dynamic amplification
             weight = min(0.2, amplification_factor / 100)  # Controlled weight
             amplified_field = current_field + weight * pattern * amplification_factor
             
             # Enforce energy conservation
-            new_energy = 0.5 * np.linalg.norm(amplified_field)**2
+            new_energy = 0.5 * torch.linalg.norm(amplified_field)**2
             if new_energy > 1e-12:
                 # Scale to maintain original energy
-                energy_scale = np.sqrt(original_energy / new_energy)
+                energy_scale = math.sqrt(original_energy / new_energy)
                 amplified_field *= energy_scale
             
             # Calculate new conservation metrics
-            field_norm = np.linalg.norm(amplified_field)
-            grad_norm = np.linalg.norm(np.gradient(amplified_field))
+            field_norm = torch.linalg.norm(amplified_field)
+            grad_norm = torch.linalg.norm(torch.gradient(amplified_field))
             xi_current = grad_norm / field_norm if field_norm > 1e-12 else 1.0571
             
             conservation_metrics = {
@@ -1166,12 +1172,12 @@ class PhysicsMemoryField(MemoryField):
                 return False
             
             # Find dominant components
-            abs_field = np.abs(current_field)
+            abs_field = torch.abs(current_field)
             
             if current_entropy < 0.1:
                 # Rapid collapse: single dominant mode
-                max_idx = np.argmax(abs_field)
-                collapsed_field = np.zeros_like(current_field)
+                max_idx = torch.argmax(abs_field)
+                collapsed_field = torch.zeros_like(current_field)
                 collapsed_field[max_idx] = current_field[max_idx]
                 
                 # Add small neighbors to maintain continuity
@@ -1182,7 +1188,7 @@ class PhysicsMemoryField(MemoryField):
                     
             else:
                 # Gradual collapse: preserve stronger modes
-                threshold = np.percentile(abs_field, (1 - current_entropy) * 100)
+                threshold = torch.quantile(abs_field.float(), (1 - current_entropy))
                 collapsed_field = current_field.copy()
                 
                 # Reduce weak components
@@ -1190,8 +1196,8 @@ class PhysicsMemoryField(MemoryField):
                 collapsed_field[weak_mask] *= current_entropy
             
             # Maintain field norm (energy conservation)
-            original_norm = np.linalg.norm(current_field)
-            new_norm = np.linalg.norm(collapsed_field)
+            original_norm = torch.linalg.norm(current_field)
+            new_norm = torch.linalg.norm(collapsed_field)
             if new_norm > 1e-12:
                 collapsed_field *= (original_norm / new_norm)
             
@@ -1208,13 +1214,13 @@ class PhysicsMemoryField(MemoryField):
             self.store_field_state(collapsed_field, conservation_metrics)
             return True
     
-    def _calculate_xi(self, field_data: np.ndarray) -> float:
+    def _calculate_xi(self, field_data: torch.Tensor) -> float:
         """Calculate balance operator Xi (Ξ) from field data."""
-        field_norm = np.linalg.norm(field_data)
+        field_norm = torch.linalg.norm(field_data)
         if field_norm < 1e-12:
             return 1.0571
         
-        grad_norm = np.linalg.norm(np.gradient(field_data))
+        grad_norm = torch.linalg.norm(torch.gradient(field_data))
         return grad_norm / field_norm
     
     def extract_cognitive_patterns(self, pattern_type: str = "memory") -> Dict[str, Any]:
@@ -1256,13 +1262,13 @@ class PhysicsMemoryField(MemoryField):
                 'extraction_timestamp': time.time()
             }
     
-    def _extract_memory_patterns(self, field_data: np.ndarray) -> List[Dict]:
+    def _extract_memory_patterns(self, field_data: torch.Tensor) -> List[Dict]:
         """Extract memory-like patterns from field structure."""
         patterns = []
         
         # Find local maxima (potential memory locations)
         from scipy.signal import find_peaks
-        peaks, properties = find_peaks(np.abs(field_data), height=0.1, distance=3)
+        peaks, properties = find_peaks(torch.abs(field_data).numpy(), height=0.1, distance=3)
         
         for i, peak_idx in enumerate(peaks):
             pattern = {
@@ -1276,16 +1282,16 @@ class PhysicsMemoryField(MemoryField):
         
         return patterns
     
-    def _extract_reasoning_patterns(self, field_data: np.ndarray) -> List[Dict]:
+    def _extract_reasoning_patterns(self, field_data: torch.Tensor) -> List[Dict]:
         """Extract reasoning patterns from field gradients and oscillations."""
         patterns = []
         
         # Calculate field derivatives for reasoning patterns
-        gradient = np.gradient(field_data)
-        second_derivative = np.gradient(gradient)
+        gradient = torch.gradient(field_data)
+        second_derivative = torch.gradient(gradient)
         
         # Find reasoning patterns in curvature
-        curvature_peaks = np.where(np.abs(second_derivative) > 0.1)[0]
+        curvature_peaks = torch.where(torch.abs(second_derivative) > 0.1)[0]
         
         for i, peak_idx in enumerate(curvature_peaks):
             pattern = {
@@ -1300,16 +1306,16 @@ class PhysicsMemoryField(MemoryField):
         
         return patterns
     
-    def _extract_attention_patterns(self, field_data: np.ndarray) -> List[Dict]:
+    def _extract_attention_patterns(self, field_data: torch.Tensor) -> List[Dict]:
         """Extract attention patterns from field gradients."""
         patterns = []
         
-        gradient = np.gradient(field_data)
-        attention_magnitude = np.abs(gradient)
+        gradient = torch.gradient(field_data)
+        attention_magnitude = torch.abs(gradient)
         
         # Find high-attention regions
-        attention_threshold = np.percentile(attention_magnitude, 75)
-        attention_regions = np.where(attention_magnitude > attention_threshold)[0]
+        attention_threshold = torch.quantile(attention_magnitude.float(), 0.75)
+        attention_regions = torch.where(attention_magnitude > attention_threshold)[0]
         
         # Group consecutive regions
         if len(attention_regions) > 0:
@@ -1325,12 +1331,12 @@ class PhysicsMemoryField(MemoryField):
             regions.append(current_region)
             
             for i, region in enumerate(regions):
-                center = int(np.mean(region))
+                center = int(torch.mean(region))
                 pattern = {
                     'type': 'attention_pattern',
                     'center': center,
                     'span': len(region),
-                    'attention_strength': float(np.mean(attention_magnitude[region])),
+                    'attention_strength': float(torch.mean(attention_magnitude[region])),
                     'region_indices': region,
                     'id': f"attn_{i}"
                 }
@@ -1338,17 +1344,17 @@ class PhysicsMemoryField(MemoryField):
         
         return patterns
     
-    def _extract_general_patterns(self, field_data: np.ndarray) -> List[Dict]:
+    def _extract_general_patterns(self, field_data: torch.Tensor) -> List[Dict]:
         """Extract general patterns from field structure."""
         patterns = []
         
         # Statistical patterns
         field_stats = {
-            'mean': float(np.mean(field_data)),
-            'std': float(np.std(field_data)),
-            'skewness': float(np.mean(((field_data - np.mean(field_data)) / np.std(field_data))**3)),
-            'energy': float(0.5 * np.sum(field_data**2)),
-            'max_amplitude': float(np.max(np.abs(field_data)))
+            'mean': float(torch.mean(field_data)),
+            'std': float(torch.std(field_data)),
+            'skewness': float(torch.mean(((field_data - torch.mean(field_data)) / torch.std(field_data))**3)),
+            'energy': float(0.5 * torch.sum(field_data**2)),
+            'max_amplitude': float(torch.max(torch.abs(field_data)))
         }
         
         patterns.append({

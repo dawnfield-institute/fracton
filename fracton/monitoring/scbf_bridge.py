@@ -7,7 +7,7 @@ SCBF consciousness benchmarks and phase transition detection.
 
 from dataclasses import dataclass
 from typing import Any, Optional, Dict, List
-import numpy as np
+import math
 
 from .pac_tree_monitor import PatternType, PACTreeMonitor
 
@@ -96,15 +96,17 @@ class EntropyCollapseDetector:
             return 0.0
         
         # Linear regression slope
-        x = np.arange(len(self._history))
-        y = np.array(self._history)
-        
-        # Normalize
-        x_norm = x - x.mean()
-        slope = np.sum(x_norm * y) / max(np.sum(x_norm ** 2), 1e-6)
-        
+        n = len(self._history)
+        x_mean = (n - 1) / 2.0
+        x_norm = [i - x_mean for i in range(n)]
+        y = self._history
+
+        slope_num = sum(xn * yi for xn, yi in zip(x_norm, y))
+        slope_den = sum(xn ** 2 for xn in x_norm)
+        slope = slope_num / max(slope_den, 1e-6)
+
         # Scale to -1 to 1
-        return np.clip(slope * 100, -1.0, 1.0)
+        return max(-1.0, min(1.0, slope * 100))
     
     def is_warning(self) -> bool:
         """Check if at warning level."""
@@ -179,7 +181,8 @@ class PhaseAlignmentTracker:
             return 0.5  # Unknown
         
         recent = self._measurements[-window:]
-        variance = np.var(recent)
+        mean_val = sum(recent) / len(recent)
+        variance = sum((v - mean_val) ** 2 for v in recent) / len(recent)
         
         # Low variance = high stability
         return 1.0 / (1.0 + variance * 100)
@@ -291,15 +294,13 @@ class SCBFBridge:
         
         # Coherence indicators:
         # 1. High reuse (patterns activated multiple times)
-        avg_activation = np.mean([
-            p.activation_count for p in profiles.values()
-        ])
+        activation_counts = [p.activation_count for p in profiles.values()]
+        avg_activation = sum(activation_counts) / len(activation_counts)
         reuse_coherence = min(avg_activation / 10, 1.0)
         
         # 2. Diverse contexts (patterns used in different situations)
-        avg_diversity = np.mean([
-            p.activation_diversity for p in profiles.values()
-        ])
+        diversities = [p.activation_diversity for p in profiles.values()]
+        avg_diversity = sum(diversities) / len(diversities)
         diversity_coherence = avg_diversity
         
         # 3. Connected structure (patterns have children)

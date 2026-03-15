@@ -8,7 +8,7 @@ throughout the Fracton ecosystem and GAIA.
 
 from .constants import (
     # Primary constants
-    PHI, XI, PHI_XI, LAMBDA_STAR,
+    PHI, XI_SEC, XI, PHI_XI, LAMBDA_STAR,
     # Derived thresholds
     SEC_EXPAND_THRESHOLD, SEC_COLLAPSE_THRESHOLD,
     # Validation
@@ -31,7 +31,7 @@ from .phase_transitions import (
 
 __all__ = [
     # Constants
-    "PHI", "XI", "PHI_XI", "LAMBDA_STAR",
+    "PHI", "XI_SEC", "XI", "PHI_XI", "LAMBDA_STAR",
     "SEC_EXPAND_THRESHOLD", "SEC_COLLAPSE_THRESHOLD",
     # Conservation
     "PACValidator", "validate_pac", "compute_residual", "enforce_conservation",

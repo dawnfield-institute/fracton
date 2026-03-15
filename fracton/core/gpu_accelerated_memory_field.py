@@ -6,7 +6,6 @@ memory field operations for high-performance infodynamics computing.
 """
 
 import torch
-import numpy as np
 from typing import Dict, Any, List, Optional
 from .memory_field import MemoryField
 import math

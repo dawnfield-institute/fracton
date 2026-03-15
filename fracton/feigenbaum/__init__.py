@@ -2,7 +2,7 @@
 Feigenbaum universality constants from PAC/Fibonacci structure.
 
 Provides closed-form Feigenbaum constants derived from the 4-5 pattern
-(period-doubling × pentagon symmetry) discovered in PACSeries Paper 3.
+(period-doubling x pentagon symmetry) discovered in PACSeries Paper 3.
 
 Key results:
     delta = phi^(20/N) where N = sqrt(39 + 1/x) self-consistently
@@ -11,6 +11,7 @@ Key results:
 
 Usage:
     from fracton.feigenbaum import DELTA, ALPHA, R_INF
+    from fracton.feigenbaum import FibonacciMobius, M10
     from fracton.feigenbaum import compute_delta, mobius_m10
 """
 
@@ -27,6 +28,12 @@ from .mobius import (
     compute_r_inf,
     compute_universal_delta_z,
 )
+from .fibonacci_mobius import FibonacciMobius, M10
+from .validation import (
+    derive_structural_constants,
+    prove_eigenvalue_identity,
+    validate_universality,
+)
 
 __all__ = [
     "DELTA", "ALPHA", "R_INF",
@@ -35,4 +42,8 @@ __all__ = [
     "UNIVERSAL_DELTA_Z", "N_SELF_CONSISTENT",
     "mobius_m10", "compute_delta",
     "compute_r_inf", "compute_universal_delta_z",
+    "FibonacciMobius", "M10",
+    "derive_structural_constants",
+    "prove_eigenvalue_identity",
+    "validate_universality",
 ]

@@ -78,6 +78,8 @@ def serialize_node(
     if node.delta is not None:
         if isinstance(node.delta, torch.Tensor):
             delta_array = node.delta.cpu().numpy()
+        elif isinstance(node.delta, np.ndarray):
+            delta_array = node.delta
         else:
             delta_array = np.array(node.delta)
     else:

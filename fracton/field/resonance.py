@@ -9,7 +9,7 @@ and information retrieval in Dawn Field Theory.
 import torch
 from typing import List, Tuple, Optional
 
-from ..physics.constants import PHI, XI, PHI_XI
+from ..physics.constants import PHI, XI_SEC, PHI_XI
 
 
 def compute_resonance(a: torch.Tensor, b: torch.Tensor) -> float:

@@ -27,7 +27,6 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any, Type, Tuple, Callable, Protocol
 from dataclasses import dataclass, field
 
-import numpy as np
 
 from .protocols import ProtocolSpec, GrowthGap, ComponentOrganism
 from .coherence import CoherenceEvaluator
@@ -836,7 +835,7 @@ Return the complete corrected implementation."""
             population=len(self.components),
             births=births,
             deaths=deaths,
-            mean_coherence=float(np.mean(coherences)),
+            mean_coherence=float(sum(coherences) / len(coherences)),
             max_coherence=max(coherences),
             best_component_id=best.id
         )

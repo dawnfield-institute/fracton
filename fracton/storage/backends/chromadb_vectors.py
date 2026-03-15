@@ -17,7 +17,6 @@ from __future__ import annotations
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 import logging
-import numpy as np
 
 import torch
 

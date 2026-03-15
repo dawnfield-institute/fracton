@@ -11,7 +11,7 @@ information dynamics in Dawn Field Theory.
 import torch
 from typing import Optional, Tuple
 
-from ..physics.constants import XI, PHI, LAMBDA_STAR
+from ..physics.constants import XI_SEC, PHI, LAMBDA_STAR
 
 
 def evolve(field: torch.Tensor,
@@ -36,7 +36,7 @@ def evolve(field: torch.Tensor,
         Evolved field tensor
     """
     if damping is None:
-        damping = 1 - LAMBDA_STAR  # = XI
+        damping = 1 - LAMBDA_STAR  # = XI_SEC
     
     # Initialize velocity (momentum)
     velocity = torch.zeros_like(field)
@@ -160,7 +160,7 @@ def evolve_with_source(field: torch.Tensor,
         Evolved field tensor
     """
     if coupling is None:
-        coupling = XI
+        coupling = XI_SEC
     
     velocity = torch.zeros_like(field)
     current = field.clone()
@@ -223,9 +223,9 @@ def dissipate(field: torch.Tensor,
         Dissipated field
     """
     if rate is None:
-        rate = 1 - LAMBDA_STAR  # = XI
+        rate = 1 - LAMBDA_STAR  # = XI_SEC
     if threshold is None:
-        threshold = XI
+        threshold = XI_SEC
     
     # Create mask for below-threshold values
     mask = torch.abs(field) < threshold
@@ -255,7 +255,7 @@ def amplify(field: torch.Tensor,
         Amplified field
     """
     if rate is None:
-        rate = XI
+        rate = XI_SEC
     if threshold is None:
         threshold = PHI * XI  # PHI_XI
     

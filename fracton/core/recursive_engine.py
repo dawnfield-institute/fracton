@@ -214,14 +214,18 @@ class CallStack:
 class RecursiveExecutor:
     """
     Main execution engine for recursive function calls in Fracton.
-    
+
     Natively implements PAC self-regulation: f(parent) = Σf(children)
     for all recursive operations. Handles entropy gating, stack management,
     tail recursion optimization, and conservation validation.
+
+    Accepts optional PhysicsPlugin instances that receive lifecycle callbacks
+    at each recursion/crystallization point.
     """
-    
-    def __init__(self, max_depth: int = 1000, enable_tail_optimization: bool = True, 
-                 entropy_regulation: bool = True, pac_regulation: bool = True):
+
+    def __init__(self, max_depth: int = 1000, enable_tail_optimization: bool = True,
+                 entropy_regulation: bool = True, pac_regulation: bool = True,
+                 plugins: Optional[List] = None):
         self.max_depth = max_depth
         self.enable_tail_optimization = enable_tail_optimization
         self.entropy_regulation = entropy_regulation
@@ -231,11 +235,31 @@ class RecursiveExecutor:
         self._entropy_gates: Dict[Callable, tuple] = {}
         self._tail_recursive_functions: set = set()
         self._execution_lock = threading.Lock()
-        
+        self._plugins: List = plugins or []
+
         # Native PAC regulation
         self.pac_regulator = get_global_pac_regulator() if pac_regulation else None
     
-    def register_entropy_gate(self, func: Callable, min_threshold: float, 
+    def add_plugin(self, plugin) -> None:
+        """Register a PhysicsPlugin."""
+        self._plugins.append(plugin)
+
+    def _notify_plugins_recurse(self, context, depth: int) -> None:
+        """Call on_recurse on all registered plugins."""
+        for p in self._plugins:
+            p.on_recurse(context, depth)
+
+    def _notify_plugins_crystallize(self, context, result: Any) -> Any:
+        """Call on_crystallize on all registered plugins, chaining results."""
+        for p in self._plugins:
+            result = p.on_crystallize(context, result)
+        return result
+
+    def _plugins_validate(self, context) -> bool:
+        """Return False if any plugin rejects the context."""
+        return all(p.validate(context) for p in self._plugins)
+
+    def register_entropy_gate(self, func: Callable, min_threshold: float,
                             max_threshold: float = 1.0) -> None:
         """Register entropy gate conditions for a function."""
         self._entropy_gates[func] = (min_threshold, max_threshold)
@@ -336,28 +360,39 @@ class RecursiveExecutor:
             with self._execution_lock:
                 # Check entropy gate conditions
                 self._check_entropy_gate(func, exec_context)
-                
+
                 # Check for stack overflow
                 if exec_context.depth >= self.max_depth:
                     raise StackOverflowError(exec_context.depth, self.max_depth)
-                
+
+                # Plugin lifecycle: pre-recurse notification + validation
+                if self._plugins:
+                    self._notify_plugins_recurse(exec_context, exec_context.depth)
+                    if not self._plugins_validate(exec_context):
+                        return None  # Plugins halted recursion
+
                 # Execute with PAC regulation if enabled
                 if self.pac_regulation and self.pac_regulator:
                     with PACRecursiveContext(self.pac_regulator, operation_name, parent_value) as pac_context:
                         result = self._execute_with_pac_validation(func, memory, exec_context, pac_context)
+                        if self._plugins:
+                            result = self._notify_plugins_crystallize(exec_context, result)
                         return result
                 else:
                     # Handle tail recursion optimization
                     if self._is_tail_recursive_call(func):
                         # Use trampoline for tail recursion
-                        return self._execute_trampoline(func, memory, exec_context)
+                        result = self._execute_trampoline(func, memory, exec_context)
                     else:
                         # Push new frame and execute with trampoline
                         self.call_stack.push(func, exec_context, exec_context.trace_id)
                         try:
-                            return self._execute_trampoline(func, memory, exec_context)
+                            result = self._execute_trampoline(func, memory, exec_context)
                         finally:
                             self.call_stack.pop()
+                    if self._plugins:
+                        result = self._notify_plugins_crystallize(exec_context, result)
+                    return result
                 
         except Exception as e:
             # Add execution context to exception

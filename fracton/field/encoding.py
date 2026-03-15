@@ -9,7 +9,7 @@ import torch
 import math
 from typing import Union, Optional, Tuple
 
-from ..physics.constants import PHI, XI, TAU
+from ..physics.constants import PHI, XI_SEC, TAU
 
 
 def spherical_encode(token_id: Union[int, torch.Tensor],
@@ -52,7 +52,7 @@ def spherical_encode(token_id: Union[int, torch.Tensor],
     
     for i in range(dim):
         # Frequency increases with dimension
-        freq = 1 + i * XI  # ξ-modulated frequency scaling
+        freq = 1 + i * XI_SEC  # ξ-modulated frequency scaling
         
         # Phase offset using golden angle
         phase = i * golden_angle
@@ -64,7 +64,7 @@ def spherical_encode(token_id: Union[int, torch.Tensor],
         # Combine spherical coordinates
         field[i] = (
             math.cos(theta) * math.sin(phi) +
-            math.sin(theta) * math.cos(phi) * XI
+            math.sin(theta) * math.cos(phi) * XI_SEC
         )
     
     # Normalize to unit sphere
@@ -104,7 +104,7 @@ def spherical_encode_batch(token_ids: torch.Tensor,
     dims = torch.arange(dim, device=device, dtype=torch.float32)
     
     # Frequencies: (dim,)
-    freqs = 1 + dims * XI
+    freqs = 1 + dims * XI_SEC
     
     # Phases: (dim,)
     phases = dims * golden_angle
@@ -118,7 +118,7 @@ def spherical_encode_batch(token_ids: torch.Tensor,
     # Spherical encoding: (batch, dim)
     field = (
         torch.cos(theta) * torch.sin(phi) +
-        torch.sin(theta) * torch.cos(phi) * XI
+        torch.sin(theta) * torch.cos(phi) * XI_SEC
     )
     
     # Normalize

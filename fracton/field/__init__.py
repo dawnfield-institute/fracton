@@ -45,6 +45,21 @@ from .evolution import (
     amplify
 )
 
+from .projections import (
+    symmetric_part,
+    antisymmetric_part,
+    decompose_tensor,
+    gradient_3d,
+    divergence_3d,
+    curl_3d,
+    laplacian_3d,
+    project_antisymmetric,
+    project_symmetric,
+    depth_2_projection,
+)
+
+from .sec_evolution import SECFieldEvolver
+
 from .resonance import (
     compute_resonance,
     compute_resonance_batch,
@@ -94,5 +109,18 @@ __all__ = [
     'harmonic_resonance',
     'phase_coherence',
     'resonance_gradient',
-    'ResonanceMesh'
+    'ResonanceMesh',
+    # Projections (v2.1)
+    'symmetric_part',
+    'antisymmetric_part',
+    'decompose_tensor',
+    'gradient_3d',
+    'divergence_3d',
+    'curl_3d',
+    'laplacian_3d',
+    'project_antisymmetric',
+    'project_symmetric',
+    'depth_2_projection',
+    # SEC Evolution (v2.1)
+    'SECFieldEvolver',
 ]

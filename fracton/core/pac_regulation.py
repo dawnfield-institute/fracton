@@ -8,7 +8,7 @@ operation automatically maintains PAC conservation: f(parent) = Σf(children)
 
 import time
 import threading
-import numpy as np
+import torch
 from typing import Dict, List, Any, Optional, Callable
 from dataclasses import dataclass
 
@@ -126,8 +126,8 @@ class PACRegulator:
             if 'conservation_value' in value:
                 return float(value['conservation_value'])
             return sum(self._extract_conservation_value(v) for v in value.values())
-        elif isinstance(value, np.ndarray):
-            return float(np.sum(value))
+        elif isinstance(value, torch.Tensor):
+            return float(torch.sum(value).item())
         elif hasattr(value, '__len__') and hasattr(value, '__iter__'):
             try:
                 return sum(self._extract_conservation_value(v) for v in value)
@@ -147,7 +147,7 @@ class PACRegulator:
                 return self.xi_target
             
             # Balance operator: ratio of children dispersion to parent magnitude
-            children_variance = np.var(children_magnitudes) if len(children_magnitudes) > 1 else 0
+            children_variance = torch.var(torch.tensor(children_magnitudes)).item() if len(children_magnitudes) > 1 else 0
             xi = (children_variance / parent_magnitude) + 1.0
             
             return xi
@@ -170,9 +170,9 @@ class PACRegulator:
             for child in children_values:
                 if isinstance(child, dict) and 'conservation_value' in child:
                     child['conservation_value'] += correction_per_child
-                elif isinstance(child, np.ndarray):
-                    # Add correction uniformly across array
-                    child += correction_per_child / child.size
+                elif isinstance(child, torch.Tensor):
+                    # Add correction uniformly across tensor
+                    child += correction_per_child / child.numel()
             
             return True
             
@@ -218,10 +218,10 @@ class PACRegulator:
                 'total_operations': len(self._conservation_history),
                 'recent_operations': len(recent_history),
                 'conservation_rate': sum(1 for r in residuals if r < self.tolerance) / len(residuals),
-                'average_residual': np.mean(residuals),
-                'max_residual': np.max(residuals),
-                'average_xi': np.mean(xi_values),
-                'xi_deviation': abs(np.mean(xi_values) - self.xi_target),
+                'average_residual': sum(residuals) / len(residuals),
+                'max_residual': max(residuals),
+                'average_xi': sum(xi_values) / len(xi_values),
+                'xi_deviation': abs(sum(xi_values) / len(xi_values) - self.xi_target),
                 'corrections_applied': corrections,
                 'total_corrections': self._correction_count
             }

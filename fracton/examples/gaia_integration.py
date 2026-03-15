@@ -11,7 +11,8 @@ Enhanced with PAC physics integration and variant generation capabilities.
 import fracton
 import time
 import json
-import numpy as np
+import math
+import torch
 from typing import Any, Dict, List, Optional, Union
 from dataclasses import dataclass
 from enum import Enum
@@ -96,27 +97,27 @@ class GAIAFractonBridge:
             
         return variant_id
     
-    def _generate_test_patterns(self, field_dimensions: tuple) -> List[np.ndarray]:
+    def _generate_test_patterns(self, field_dimensions: tuple) -> List[torch.Tensor]:
         """Generate test patterns for pattern recognition testing."""
         patterns = []
-        field_size = int(np.prod(field_dimensions))
+        field_size = int(math.prod(field_dimensions))
         
         # Pattern 1: Sine wave
-        x = np.linspace(0, 4*np.pi, field_size)
-        patterns.append(np.sin(x))
+        x = torch.linspace(0, 4*math.pi, field_size)
+        patterns.append(torch.sin(x))
         
         # Pattern 2: Gaussian
-        x = np.linspace(-3, 3, field_size)
-        patterns.append(np.exp(-x**2))
+        x = torch.linspace(-3, 3, field_size)
+        patterns.append(torch.exp(-x**2))
         
         # Pattern 3: Step function
-        pattern = np.zeros(field_size)
+        pattern = torch.zeros(field_size)
         pattern[field_size//3:2*field_size//3] = 1.0
         patterns.append(pattern)
         
         return patterns
     
-    def _recognize_pattern_with_conservation(self, physics_field, pattern: np.ndarray, context) -> Dict:
+    def _recognize_pattern_with_conservation(self, physics_field, pattern: torch.Tensor, context) -> Dict:
         """Recognize pattern while maintaining PAC conservation."""
         # Get current field state
         current_field = physics_field.get("field_data")
@@ -126,13 +127,13 @@ class GAIAFractonBridge:
         if len(current_field) != len(pattern):
             # Resize pattern to match field
             from scipy.interpolate import interp1d
-            x_old = np.linspace(0, 1, len(pattern))
-            x_new = np.linspace(0, 1, len(current_field))
+            x_old = torch.linspace(0, 1, len(pattern))
+            x_new = torch.linspace(0, 1, len(current_field))
             f = interp1d(x_old, pattern, kind='linear', fill_value='extrapolate')
             pattern = f(x_new)
         
-        similarity = np.corrcoef(current_field, pattern)[0, 1]
-        if np.isnan(similarity):
+        similarity = torch.corrcoef(torch.stack([torch.as_tensor(current_field, dtype=torch.float32), torch.as_tensor(pattern, dtype=torch.float32)]))[0, 1].item()
+        if math.isnan(similarity):
             similarity = 0.0
         
         # Pattern recognition accuracy
@@ -171,7 +172,7 @@ class GAIAFractonBridge:
         
         for i in range(num_samples):
             # Generate candidate value
-            candidate = initial_guess + (np.random.random() - 0.5) * search_range
+            candidate = initial_guess + (torch.rand(1).item() - 0.5) * search_range
             candidate_objective = objective_function(candidate)
             
             # Update if better
@@ -182,7 +183,7 @@ class GAIAFractonBridge:
             # Update field to reflect optimization progress
             # Encode optimization state in field
             optimization_progress = i / num_samples
-            field_update = current_field * (1 + 0.01 * optimization_progress * np.sin(np.arange(len(current_field))))
+            field_update = current_field * (1 + 0.01 * optimization_progress * torch.sin(torch.arange(len(current_field), dtype=torch.float32)))
             
             # Store updated field
             physics_field.set("field_data", field_update)
@@ -199,7 +200,7 @@ class GAIAFractonBridge:
             
             # Simple Klein-Gordon evolution
             mass_squared = getattr(config, 'klein_gordon_mass_squared', 0.1)
-            laplacian = np.zeros_like(current_field)
+            laplacian = torch.zeros_like(current_field)
             laplacian[1:-1] = current_field[2:] - 2*current_field[1:-1] + current_field[:-2]
             laplacian[0] = laplacian[1]
             laplacian[-1] = laplacian[-2]
@@ -209,54 +210,54 @@ class GAIAFractonBridge:
             
             physics_field.set("field_data", evolved_field)
     
-    def _initialize_variant_field(self, config: GAIAVariantConfig) -> np.ndarray:
+    def _initialize_variant_field(self, config: GAIAVariantConfig) -> torch.Tensor:
         """Initialize field data based on variant configuration."""
-        field_size = np.prod(config.field_dimensions)
+        field_size = math.prod(config.field_dimensions)
         
         if config.variant_type == GAIAVariantType.QUANTUM_FOCUSED:
             # Quantum superposition-like initial state
-            real_part = np.random.random(field_size)
-            imag_part = np.random.random(field_size)
-            field = (real_part + 1j * imag_part).astype(np.complex128)
-            field = field / np.linalg.norm(field)  # Normalize
+            real_part = torch.rand(field_size)
+            imag_part = torch.rand(field_size)
+            field = torch.complex(real_part, imag_part)
+            field = field / torch.linalg.norm(field)  # Normalize
             # Convert to real for now (Fracton may not handle complex)
-            field = np.real(field).astype(np.float64)
-            
+            field = field.real.to(torch.float64)
+
         elif config.variant_type == GAIAVariantType.COGNITIVE_ENHANCED:
             # Structured cognitive field with memory patterns
-            field = np.zeros(field_size, dtype=np.float64)
+            field = torch.zeros(field_size, dtype=torch.float64)
             # Add cognitive structure patterns
             for i in range(0, field_size, 8):
-                field[i:i+4] = np.random.random(4) * 0.5  # Memory banks
-                field[i+4:i+8] = np.sin(np.linspace(0, 2*np.pi, 4)) * 0.3  # Oscillatory patterns
-                
+                field[i:i+4] = torch.rand(4) * 0.5  # Memory banks
+                field[i+4:i+8] = torch.sin(torch.linspace(0, 2*math.pi, 4)) * 0.3  # Oscillatory patterns
+
         elif config.variant_type == GAIAVariantType.OPTIMIZATION_SPECIALIZED:
             # Gradient-optimized initial configuration
-            x = np.linspace(-2, 2, field_size)
-            field = np.exp(-x**2) * np.cos(3*x)  # Smooth optimization landscape
+            x = torch.linspace(-2, 2, field_size)
+            field = torch.exp(-x**2) * torch.cos(3*x)  # Smooth optimization landscape
             
         elif config.variant_type == GAIAVariantType.MATERIAL_DESIGN:
             # Crystal-like structured field for materials modeling
-            field = np.zeros(field_size, dtype=np.float64)
+            field = torch.zeros(field_size, dtype=torch.float64)
             # Create periodic crystal-like structure
             period = min(16, field_size // 4)
             for i in range(field_size):
-                field[i] = np.sin(2*np.pi*i/period) + 0.5*np.sin(4*np.pi*i/period)
-                
+                field[i] = math.sin(2*math.pi*i/period) + 0.5*math.sin(4*math.pi*i/period)
+
         elif config.variant_type == GAIAVariantType.CONSCIOUSNESS_MODELING:
             # Hierarchical awareness patterns
-            field = np.random.random(field_size)
+            field = torch.rand(field_size, dtype=torch.float64)
             # Create hierarchical structure
-            for level in range(int(np.log2(field_size))):
+            for level in range(int(math.log2(field_size))):
                 scale = 2**level
                 field[::scale] *= (1 + 0.2*level)  # Amplify hierarchical levels
-                
+
         else:  # STANDARD
             # Standard normalized random field
-            field = np.random.random(field_size)
-            field = field / np.linalg.norm(field)
-            
-        return field.astype(np.float64)
+            field = torch.rand(field_size, dtype=torch.float64)
+            field = field / torch.linalg.norm(field)
+
+        return field.to(torch.float64)
     
     def test_variant_intelligence(self, variant_id: str, test_suite_config: Dict) -> Dict:
         """Test intelligence capabilities of a specific variant."""
@@ -299,8 +300,8 @@ class GAIAFractonBridge:
         # Calculate performance summary
         test_scores = [test["score"] for test in results["tests"].values()]
         results["performance_summary"] = {
-            "average_score": np.mean(test_scores),
-            "score_stability": 1.0 - np.std(test_scores),
+            "average_score": sum(test_scores) / len(test_scores) if test_scores else 0.0,
+            "score_stability": 1.0 - (sum((s - sum(test_scores)/len(test_scores))**2 for s in test_scores) / len(test_scores))**0.5 if test_scores else 1.0,
             "conservation_quality": 1.0 - abs(physics_state.get('conservation_residual', 0.0)),
             "physics_consistency": 1.0 - abs(physics_state.get('xi_deviation', 0.0))
         }
@@ -390,8 +391,8 @@ class GAIAFractonBridge:
         """Test memory persistence through field evolution."""
         # Store test memories
         test_memories = {
-            "concept_1": np.array([1, 2, 3, 4]),
-            "concept_2": np.array([5, 6, 7, 8]),
+            "concept_1": torch.tensor([1, 2, 3, 4]),
+            "concept_2": torch.tensor([5, 6, 7, 8]),
             "relationship": {"from": "concept_1", "to": "concept_2", "strength": 0.8}
         }
         
@@ -410,8 +411,8 @@ class GAIAFractonBridge:
             degradation = 0.0
             for key, original_memory in test_memories.items():
                 current_memory = physics_field.get(f"memory_{key}")
-                if isinstance(original_memory, np.ndarray) and isinstance(current_memory, np.ndarray):
-                    degradation += np.linalg.norm(current_memory - original_memory)
+                if isinstance(original_memory, torch.Tensor) and isinstance(current_memory, torch.Tensor):
+                    degradation += torch.linalg.norm(current_memory - original_memory)
                     
             memory_degradation.append(degradation)
             
@@ -1143,29 +1144,29 @@ def _calculate_self_awareness(consolidated_insights):
 
 # PAC Physics Integration Helper Functions
 
-def _generate_conserved_field_variations(field_data: np.ndarray, entropy_level: float) -> List[np.ndarray]:
+def _generate_conserved_field_variations(field_data: torch.Tensor, entropy_level: float) -> List[torch.Tensor]:
     """Generate field variations while maintaining PAC conservation."""
     variations = []
     num_variations = max(1, int(entropy_level * 4))
     
-    original_norm = np.linalg.norm(field_data)
+    original_norm = torch.linalg.norm(field_data)
     
     for i in range(num_variations):
         # Create variation with entropy-controlled perturbation
-        perturbation = np.random.random(field_data.shape) * entropy_level * 0.1
+        perturbation = torch.rand(field_data.shape) * entropy_level * 0.1
         variation = field_data + perturbation
         
         # Enforce conservation by normalizing to original energy
-        variation = variation * (original_norm / np.linalg.norm(variation))
+        variation = variation * (original_norm / torch.linalg.norm(variation))
         variations.append(variation)
         
     return variations
 
 
-def _enforce_pac_conservation(field_data: np.ndarray, config: GAIAVariantConfig) -> PhysicsState:
+def _enforce_pac_conservation(field_data: torch.Tensor, config: GAIAVariantConfig) -> PhysicsState:
     """Enforce PAC conservation and return updated physics state."""
     # Calculate field properties
-    field_norm = np.linalg.norm(field_data)
+    field_norm = torch.linalg.norm(field_data)
     field_energy = 0.5 * field_norm**2
     
     # Calculate Klein-Gordon energy
@@ -1188,32 +1189,41 @@ def _enforce_pac_conservation(field_data: np.ndarray, config: GAIAVariantConfig)
     )
 
 
-def _calculate_klein_gordon_energy(field_data: np.ndarray, mass_squared: float) -> float:
+def _calculate_klein_gordon_energy(field_data: torch.Tensor, mass_squared: float) -> float:
     """Calculate Klein-Gordon field energy."""
     # Simplified 1D Klein-Gordon energy calculation
     # E = (1/2) * (∂φ/∂t)² + (1/2) * (∇φ)² + (1/2) * m² * φ²
     
-    # Approximate spatial gradient
-    grad_phi = np.gradient(field_data)
-    gradient_energy = 0.5 * np.sum(grad_phi**2)
-    
+    # Approximate spatial gradient using finite differences
+    field_t = torch.as_tensor(field_data, dtype=torch.float32)
+    grad_phi = torch.zeros_like(field_t)
+    grad_phi[1:-1] = (field_t[2:] - field_t[:-2]) / 2.0
+    grad_phi[0] = field_t[1] - field_t[0]
+    grad_phi[-1] = field_t[-1] - field_t[-2]
+    gradient_energy = 0.5 * torch.sum(grad_phi**2).item()
+
     # Mass term energy
-    mass_energy = 0.5 * mass_squared * np.sum(field_data**2)
-    
+    mass_energy = 0.5 * mass_squared * torch.sum(field_t**2).item()
+
     # Kinetic energy (assume ∂φ/∂t ≈ gradient for simplicity)
-    kinetic_energy = 0.5 * np.sum(grad_phi**2)
+    kinetic_energy = 0.5 * torch.sum(grad_phi**2).item()
     
     total_energy = kinetic_energy + gradient_energy + mass_energy
     return total_energy
 
 
-def _calculate_balance_operator(field_data: np.ndarray) -> float:
+def _calculate_balance_operator(field_data: torch.Tensor) -> float:
     """Calculate balance operator Xi (Ξ) from field data."""
     # Ξ = ∫||∇f(v)||dv / ∫||f(v)||dv
     # Simplified version using field gradients
     
-    grad_norm = np.linalg.norm(np.gradient(field_data))
-    field_norm = np.linalg.norm(field_data)
+    field_t = torch.as_tensor(field_data, dtype=torch.float32)
+    grad = torch.zeros_like(field_t)
+    grad[1:-1] = (field_t[2:] - field_t[:-2]) / 2.0
+    grad[0] = field_t[1] - field_t[0]
+    grad[-1] = field_t[-1] - field_t[-2]
+    grad_norm = torch.linalg.norm(grad)
+    field_norm = torch.linalg.norm(field_data)
     
     if field_norm < 1e-12:
         return 1.0571  # Default target value
@@ -1222,13 +1232,13 @@ def _calculate_balance_operator(field_data: np.ndarray) -> float:
     return xi
 
 
-def _evolve_klein_gordon_step(field_data: np.ndarray, dt: float, mass_squared: float) -> np.ndarray:
+def _evolve_klein_gordon_step(field_data: torch.Tensor, dt: float, mass_squared: float) -> torch.Tensor:
     """Evolve field one step using Klein-Gordon equation."""
     # Simplified Klein-Gordon evolution: ∂²φ/∂t² = ∇²φ - m²φ
     # Using finite difference approximation
     
     # Calculate Laplacian (∇²φ)
-    laplacian = np.zeros_like(field_data)
+    laplacian = torch.zeros_like(field_data)
     
     # Interior points (second derivative approximation)
     laplacian[1:-1] = field_data[2:] - 2*field_data[1:-1] + field_data[:-2]
@@ -1286,42 +1296,45 @@ def _integrate_variation_results(memory, variation_result: Dict, config: GAIAVar
         memory.set("physics_state", updated_physics_state)
 
 
-def _generate_test_patterns(field_dimensions: tuple) -> List[np.ndarray]:
+def _generate_test_patterns(field_dimensions: tuple) -> List[torch.Tensor]:
     """Generate test patterns for pattern recognition testing."""
     patterns = []
-    field_size = np.prod(field_dimensions)
+    field_size = math.prod(field_dimensions)
     
     # Pattern 1: Sine wave
-    x = np.linspace(0, 4*np.pi, field_size)
-    patterns.append(np.sin(x))
-    
+    x = torch.linspace(0, 4*math.pi, field_size)
+    patterns.append(torch.sin(x))
+
     # Pattern 2: Gaussian
-    x = np.linspace(-3, 3, field_size)
-    patterns.append(np.exp(-x**2))
+    x = torch.linspace(-3, 3, field_size)
+    patterns.append(torch.exp(-x**2))
     
     # Pattern 3: Step function
-    pattern = np.zeros(field_size)
+    pattern = torch.zeros(field_size)
     pattern[field_size//3:2*field_size//3] = 1.0
     patterns.append(pattern)
     
     # Pattern 4: Random but structured
-    np.random.seed(42)  # Reproducible
-    pattern = np.random.random(field_size)
-    pattern = np.convolve(pattern, [0.25, 0.5, 0.25], mode='same')  # Smooth
+    torch.manual_seed(42)  # Reproducible
+    pattern = torch.rand(field_size)
+    # Smooth with [0.25, 0.5, 0.25] kernel (manual convolution, same-mode)
+    kernel = torch.tensor([0.25, 0.5, 0.25])
+    padded = torch.nn.functional.pad(pattern.unsqueeze(0).unsqueeze(0), (1, 1), mode='replicate')
+    pattern = torch.nn.functional.conv1d(padded, kernel.unsqueeze(0).unsqueeze(0)).squeeze()
     patterns.append(pattern)
     
     return patterns
 
 
-def _recognize_pattern_with_conservation(physics_field, pattern: np.ndarray, context) -> Dict:
+def _recognize_pattern_with_conservation(physics_field, pattern: torch.Tensor, context) -> Dict:
     """Recognize pattern while maintaining PAC conservation."""
     # Get current field state
     current_field = physics_field.get("field_data")
     config = physics_field.get("config")
     
     # Calculate pattern similarity
-    similarity = np.corrcoef(current_field, pattern)[0, 1]
-    if np.isnan(similarity):
+    similarity = torch.corrcoef(torch.stack([torch.as_tensor(current_field, dtype=torch.float32), torch.as_tensor(pattern, dtype=torch.float32)]))[0, 1].item()
+    if math.isnan(similarity):
         similarity = 0.0
     
     # Pattern recognition accuracy
@@ -1361,7 +1374,7 @@ def _optimize_with_conservation(physics_field, objective_function, initial_guess
     
     for i in range(num_samples):
         # Generate candidate value
-        candidate = initial_guess + (np.random.random() - 0.5) * search_range
+        candidate = initial_guess + (torch.rand(1).item() - 0.5) * search_range
         candidate_objective = objective_function(candidate)
         
         # Update if better
@@ -1372,7 +1385,7 @@ def _optimize_with_conservation(physics_field, objective_function, initial_guess
         # Update field to reflect optimization progress
         # Encode optimization state in field
         optimization_progress = i / num_samples
-        field_update = current_field * (1 + 0.01 * optimization_progress * np.sin(np.arange(len(current_field))))
+        field_update = current_field * (1 + 0.01 * optimization_progress * torch.sin(torch.arange(len(current_field), dtype=torch.float32)))
         
         # Enforce conservation
         updated_physics_state = _enforce_pac_conservation(field_update, config)

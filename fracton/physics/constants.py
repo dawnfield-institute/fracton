@@ -34,8 +34,15 @@ PHI_INV: float = 1 / PHI  # 0.6180339887... = PHI - 1
 
 # SEC Collapse Threshold: φ⁻¹ scaled to 0.1 range
 # Derivation: PHI_INV / 10 = 0.0618033988...
-XI: float = PHI_INV / 10
-"""SEC collapse threshold - when potential < XI, pattern collapses to parent."""
+XI_SEC: float = PHI_INV / 10
+"""SEC collapse threshold - when potential < XI_SEC, pattern collapses to parent.
+
+Named XI_SEC to distinguish from the balance constant XI ≈ 1.0584 (γ + ln(φ))
+defined in fracton.constants.mathematical.
+"""
+
+# Backward compat alias — will be removed in 3.0
+XI: float = XI_SEC
 
 # SEC Expansion Threshold: φ⁻¹ / φ² = φ⁻³ ≈ 0.1459 → rounded to 0.1
 # Alternative derivation: 1/10 (decimal scaling for practical thresholds)
@@ -55,14 +62,14 @@ LAMBDA_STAR: float = 1 - (PHI_INV / 100)  # ≈ 0.9938
 SEC_EXPAND_THRESHOLD: float = PHI_XI  # 0.1 - triggers expansion
 """When potential exceeds this, pattern should expand (lazy evaluation triggers)."""
 
-SEC_COLLAPSE_THRESHOLD: float = XI  # φ⁻¹/10 ≈ 0.0618 - triggers collapse  
+SEC_COLLAPSE_THRESHOLD: float = XI_SEC  # φ⁻¹/10 ≈ 0.0618 - triggers collapse
 """When potential drops below this, pattern collapses to parent."""
 
-# Stable band: [XI, PHI_XI] = [0.0618, 0.1]
+# Stable band: [XI_SEC, PHI_XI] = [0.0618, 0.1]
 # Width ≈ 0.0382 = φ⁻¹/10 * (φ-1) - golden-ratio proportioned
 
 # Crystallization threshold (high-importance patterns)
-CRYSTALLIZATION_THRESHOLD: float = PHI + XI  # ≈ 1.68
+CRYSTALLIZATION_THRESHOLD: float = PHI + XI_SEC  # ≈ 1.68
 """High-importance pattern threshold for crystallization."""
 
 
@@ -78,8 +85,9 @@ PHI_SQUARED: float = PHI ** 2  # 2.618...
 PHI_CUBED: float = PHI ** 3  # 4.236...
 PHI_FOURTH: float = PHI ** 4  # 6.854...
 
-# Inverse of XI (useful for scaling)
-XI_INV: float = 1 / XI  # 10/φ⁻¹ = 10φ ≈ 16.18
+# Inverse of XI_SEC (useful for scaling)
+XI_SEC_INV: float = 1 / XI_SEC  # 10/φ⁻¹ = 10φ ≈ 16.18
+XI_INV: float = XI_SEC_INV  # Backward compat alias
 
 
 # ==============================================================================
@@ -128,7 +136,8 @@ def validate_sec_threshold(potential: float) -> str:
 # Dict form for serialization
 CONSTANTS_DICT = {
     "PHI": PHI,
-    "XI": XI,
+    "XI_SEC": XI_SEC,
+    "XI": XI,  # backward compat
     "PHI_XI": PHI_XI,
     "LAMBDA_STAR": LAMBDA_STAR,
     "SEC_EXPAND_THRESHOLD": SEC_EXPAND_THRESHOLD,

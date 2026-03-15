@@ -84,3 +84,74 @@ class TestMobiusTransformation:
         from fracton.feigenbaum import compute_universal_delta_z, UNIVERSAL_DELTA_Z
         dz = compute_universal_delta_z()
         assert abs(dz - UNIVERSAL_DELTA_Z) < 1e-12
+
+
+class TestFibonacciMobius:
+    """Test the FibonacciMobius class (v2.1)."""
+
+    def test_m10_callable(self):
+        from fracton.feigenbaum import M10
+        from fracton.constants.mathematical import PHI_INV
+        val = M10(-PHI_INV)
+        assert abs(val - (-PHI_INV)) < 1e-10
+
+    def test_m10_eigenvalue(self):
+        from fracton.feigenbaum import M10
+        from fracton.constants.mathematical import PHI
+        # Eigenvalue at unstable fixed point should be phi^20
+        eigenval = M10.eigenvalue_at_unstable
+        assert abs(eigenval - PHI**20) / PHI**20 < 1e-10
+
+    def test_m10_fixed_points(self):
+        from fracton.feigenbaum import M10
+        from fracton.constants.mathematical import PHI, PHI_INV
+        stable, unstable = M10.fixed_points
+        assert abs(stable - PHI) < 1e-14
+        assert abs(unstable - (-PHI_INV)) < 1e-14
+
+    def test_verify_eigenvalue_identity(self):
+        from fracton.feigenbaum import M10
+        result = M10.verify_eigenvalue_identity()
+        assert result["is_exact"]
+        assert result["error"] < 1e-14
+
+    def test_custom_mobius(self):
+        from fracton.feigenbaum import FibonacciMobius
+        from fracton.constants.mathematical import PHI_INV
+        m5 = FibonacciMobius(5)
+        # -1/phi is always a fixed point
+        val = m5(-PHI_INV)
+        assert abs(val - (-PHI_INV)) < 1e-10
+
+    def test_derivative(self):
+        from fracton.feigenbaum import M10
+        from fracton.constants.mathematical import PHI_INV
+        # Derivative at unstable fixed point
+        deriv = M10.derivative_at(-PHI_INV)
+        assert abs(deriv) > 1  # Unstable: |derivative| > 1
+
+
+class TestFeigenbaumValidation:
+    """Test validation functions (v2.1)."""
+
+    def test_derive_structural_constants(self):
+        from fracton.feigenbaum import derive_structural_constants
+        derivations = derive_structural_constants()
+        assert derivations["39"]["matches"]
+        assert derivations["160"]["matches"]
+        assert derivations["1371"]["matches"]
+        assert derivations["1857"]["matches"]
+
+    def test_prove_eigenvalue_identity(self):
+        from fracton.feigenbaum import prove_eigenvalue_identity
+        proof = prove_eigenvalue_identity()
+        assert proof["is_exact"]
+        assert proof["proof_verified"]
+        assert abs(proof["proof_product"] - 1) < 1e-10
+
+    def test_validate_universality(self):
+        from fracton.feigenbaum import validate_universality
+        results = validate_universality()
+        assert results["logistic"]["error_percent"] < 1e-10
+        # Scale ratio should be ~4
+        assert abs(results["scale_ratio"]["observed"] - 4.0) < 0.01

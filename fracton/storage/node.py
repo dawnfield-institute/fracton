@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, List, Optional
 
-import numpy as np
+import torch
 
 
 @dataclass
@@ -99,8 +99,8 @@ class KronosNode:
     # Historical trail of how concept developed
 
     # === Embeddings (dual representation, delta-only) ===
-    delta_embedding: Optional[np.ndarray] = None  # Δ from parent (semantic)
-    delta_structural: Optional[np.ndarray] = None  # Δ from parent (structural)
+    delta_embedding: Optional[torch.Tensor] = None  # delta from parent (semantic)
+    delta_structural: Optional[torch.Tensor] = None  # delta from parent (structural)
 
     # Full embeddings reconstructed on demand:
     # semantic_embedding = parent.semantic + self.delta_embedding
@@ -303,12 +303,12 @@ class KronosNode:
 
         # Reconstruct embeddings
         delta_embedding = (
-            np.array(data["delta_embedding"])
+            torch.tensor(data["delta_embedding"])
             if data.get("delta_embedding") is not None
             else None
         )
         delta_structural = (
-            np.array(data["delta_structural"])
+            torch.tensor(data["delta_structural"])
             if data.get("delta_structural") is not None
             else None
         )

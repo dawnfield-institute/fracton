@@ -37,6 +37,8 @@ import warnings
 # === Recursive Core ===
 # The mainstay: everything needed for recursive, entropy-aware computation.
 
+from .core.physics_plugin import PhysicsPlugin
+
 from .core import (
     # Recursive engine
     RecursiveExecutor, ExecutionContext,
@@ -63,7 +65,7 @@ from .lang import (
 )
 
 # Version info
-__version__ = "2.0.0a1"
+__version__ = "2.1.0"
 __author__ = "Dawn Field Institute"
 __email__ = "info@dawnfield.org"
 

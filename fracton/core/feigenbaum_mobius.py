@@ -1,5 +1,9 @@
 """
-Feigenbaum-Möbius Constants and Structure
+Feigenbaum-Möbius Constants and Structure (DEPRECATED)
+
+.. deprecated:: 2.1.0
+    Use ``fracton.feigenbaum`` instead. This module is kept for backward
+    compatibility and will be removed in 3.0.
 
 This module provides the validated mathematical structure connecting
 Feigenbaum universality constants to Fibonacci Möbius transformations.
@@ -33,7 +37,7 @@ Reference: dawn-field-theory/foundational/experiments/sec_threshold_detection/
 
 from __future__ import annotations
 
-import numpy as np
+import math
 from typing import Tuple, Optional, Dict, Any
 from dataclasses import dataclass
 
@@ -56,8 +60,8 @@ __all__ = [
 # =============================================================================
 
 # Golden ratio - unique positive solution to r² = r + 1
-PHI = (1 + np.sqrt(5)) / 2  # 1.6180339887498949...
-PHI_INV = 1 / PHI           # 0.6180339887498949... = φ - 1
+PHI = (1 + math.sqrt(5)) / 2  # 1.6180339887498949...
+PHI_INV = 1 / PHI              # 0.6180339887498949... = φ - 1
 
 # Fibonacci sequence (0-indexed array, F₁=1, F₂=1, F₃=2, ...)
 # FIBONACCI[0]=F₁=1, FIBONACCI[1]=F₂=1, FIBONACCI[9]=F₁₀=55, etc.
@@ -97,7 +101,7 @@ CONST_1857 = 1857  # F₁₀ × F₉ - F₇ = 55 × 34 - 13
 #   Ξ - 1 = within + cross = 2√(r(1-r))-1 + cross = π/55 per level
 #   where r = 1/φ, validated to 8 decimal places
 #   Trace: dawn-field-theory/foundational/experiments/oscillation_attractor_dynamics/scripts/exp_24_comprehensive_validation.py
-XI = 1 + np.pi / 55  # 1.0571... (DERIVED, not curve-fit)
+XI_DISCRETE = 1 + math.pi / 55  # 1.0571... (DERIVED, not curve-fit)
 
 # =============================================================================
 # MÖBIUS TRANSFORMATION STRUCTURE
@@ -210,7 +214,7 @@ def compute_delta_self_consistent(
     
     for i in range(max_iterations):
         # Compute N from x
-        N = np.sqrt(CONST_39 + 1/x)
+        N = math.sqrt(CONST_39 + 1/x)
         
         # Compute δ from N
         delta_new = PHI ** (20 / N)
@@ -228,7 +232,7 @@ def compute_delta_self_consistent(
             "N": N,
             "x": x_new,
             "error": error,
-            "digits": -np.log10(error) if error > 0 else 16
+            "digits": -math.log10(error) if error > 0 else 16
         })
         
         # Check convergence
@@ -243,14 +247,14 @@ def compute_delta_self_consistent(
         "known_delta": DELTA_FEIGENBAUM,
         "error": abs(delta - DELTA_FEIGENBAUM),
         "error_percent": abs(delta - DELTA_FEIGENBAUM) / DELTA_FEIGENBAUM * 100,
-        "digits_accuracy": -np.log10(abs(delta - DELTA_FEIGENBAUM)) if abs(delta - DELTA_FEIGENBAUM) > 0 else 16,
+        "digits_accuracy": -math.log10(abs(delta - DELTA_FEIGENBAUM)) if abs(delta - DELTA_FEIGENBAUM) > 0 else 16,
         "iterations": len(history),
         "history": history
     }
 
 
 def compute_r_inf_from_mobius(
-    scale_factor: float = np.pi,
+    scale_factor: float = math.pi,
     delta_z: Optional[float] = None
 ) -> Tuple[float, Dict[str, Any]]:
     """
@@ -285,7 +289,7 @@ def compute_r_inf_from_mobius(
         "z": z,
         "M10(z)": m10_z,
         "r_inf": r_inf,
-        "known_r_inf": R_INF_LOGISTIC if abs(scale_factor - np.pi) < 0.01 else R_INF_SINE
+        "known_r_inf": R_INF_LOGISTIC if abs(scale_factor - math.pi) < 0.01 else R_INF_SINE
     }
 
 
@@ -300,12 +304,12 @@ def compute_universal_delta_z() -> float:
     This is derived from the logistic map and should work for sine map too.
     """
     # From logistic map
-    target_logistic = R_INF_LOGISTIC / np.pi
+    target_logistic = R_INF_LOGISTIC / math.pi
     z = (34 * target_logistic - 55) / (89 - 55 * target_logistic)
     delta_z_logistic = z - (-PHI_INV)
     
     # Verify with sine map
-    target_sine = R_INF_SINE / (np.pi / 4)
+    target_sine = R_INF_SINE / (math.pi / 4)
     z_sine = (34 * target_sine - 55) / (89 - 55 * target_sine)
     delta_z_sine = z_sine - (-PHI_INV)
     
@@ -330,7 +334,7 @@ def validate_universality() -> Dict[str, Any]:
     
     # Test logistic map
     r_inf_logistic, info_logistic = compute_r_inf_from_mobius(
-        scale_factor=np.pi, 
+        scale_factor=math.pi, 
         delta_z=UNIVERSAL_DELTA_Z
     )
     results["logistic"] = {
@@ -342,7 +346,7 @@ def validate_universality() -> Dict[str, Any]:
     
     # Test sine map
     r_inf_sine, info_sine = compute_r_inf_from_mobius(
-        scale_factor=np.pi/4, 
+        scale_factor=math.pi/4, 
         delta_z=UNIVERSAL_DELTA_Z
     )
     results["sine"] = {

@@ -12,8 +12,8 @@ from typing import Union, Tuple
 from dataclasses import dataclass
 
 from .constants import (
-    PHI, XI, PHI_XI,
-    SEC_EXPAND_THRESHOLD, 
+    PHI, XI_SEC, PHI_XI,
+    SEC_EXPAND_THRESHOLD,
     SEC_COLLAPSE_THRESHOLD
 )
 
@@ -112,9 +112,9 @@ def compute_phase_energy(state: PhaseState) -> float:
         Characteristic energy value
     """
     if state == PhaseState.COLLAPSED:
-        return XI / 2  # Minimum energy
+        return XI_SEC / 2  # Minimum energy
     elif state == PhaseState.STABLE:
-        return (XI + PHI_XI) / 2  # Middle energy
+        return (XI_SEC + PHI_XI) / 2  # Middle energy
     else:  # EXPANDED
         return PHI_XI * PHI  # Maximum energy
 
@@ -139,7 +139,7 @@ def transition_cost(from_state: PhaseState, to_state: PhaseState) -> float:
     if to_state == PhaseState.EXPANDED:
         return abs(to_energy - from_energy) * PHI
     elif to_state == PhaseState.COLLAPSED:
-        return abs(to_energy - from_energy) * XI
+        return abs(to_energy - from_energy) * XI_SEC
     else:
         return abs(to_energy - from_energy)
 

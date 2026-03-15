@@ -6,6 +6,7 @@ including recursive calls, crystallization, branching, and context management.
 """
 
 import uuid
+import math
 from typing import Any, Callable, Dict, List, Optional, Union
 from ..core.recursive_engine import ExecutionContext, get_default_executor, Continuation
 from ..core.bifractal_trace import BifractalTrace
@@ -617,7 +618,7 @@ def klein_gordon_evolution(memory: MemoryField, dt: float, mass_squared: float =
     Returns:
         Evolved field data with conservation metrics
     """
-    import numpy as np
+    import torch
     
     # Check if memory has physics support
     if hasattr(memory, 'evolve_klein_gordon'):
@@ -630,7 +631,7 @@ def klein_gordon_evolution(memory: MemoryField, dt: float, mass_squared: float =
         return None
     
     # Simple Klein-Gordon evolution
-    laplacian = np.zeros_like(field_data)
+    laplacian = torch.zeros_like(field_data)
     laplacian[1:-1] = field_data[2:] - 2*field_data[1:-1] + field_data[:-2]
     laplacian[0] = laplacian[1]
     laplacian[-1] = laplacian[-2]
@@ -659,7 +660,7 @@ def enforce_pac_conservation(memory: MemoryField, xi_target: float = 1.0571,
     Returns:
         True if conservation is satisfied or successfully enforced
     """
-    import numpy as np
+    import torch
     
     # Check if memory has physics support
     if hasattr(memory, 'enforce_pac_conservation'):
@@ -671,7 +672,7 @@ def enforce_pac_conservation(memory: MemoryField, xi_target: float = 1.0571,
         return False
     
     # Calculate current conservation metrics
-    field_norm = np.linalg.norm(field_data)
+    field_norm = torch.linalg.norm(field_data)
     field_energy = 0.5 * field_norm**2
     
     # Simple conservation check: energy should remain constant
@@ -682,7 +683,7 @@ def enforce_pac_conservation(memory: MemoryField, xi_target: float = 1.0571,
         return True
     
     # Attempt correction by renormalizing
-    target_norm = np.sqrt(2 * initial_energy)
+    target_norm = torch.sqrt(torch.tensor(2 * initial_energy))
     if field_norm > 1e-12:
         corrected_field = field_data * (target_norm / field_norm)
         memory.set('field_data', corrected_field)
@@ -707,7 +708,7 @@ def calculate_balance_operator(memory: MemoryField) -> float:
     Returns:
         Balance operator value (target: 1.0571)
     """
-    import numpy as np
+    import torch
     
     field_data = memory.get('field_data')
     if field_data is None:
@@ -717,7 +718,7 @@ def calculate_balance_operator(memory: MemoryField) -> float:
     # derived from PAC theory, not a field-dependent calculation.
     # We validate field compatibility rather than calculate Ξ.
     
-    field_norm = np.linalg.norm(field_data)
+    field_norm = torch.linalg.norm(field_data)
     if field_norm < 1e-12:
         return 1.0571
     
@@ -760,7 +761,7 @@ def field_pattern_matching(memory: MemoryField, target_pattern: Any,
     Returns:
         Pattern matching results with conservation metrics
     """
-    import numpy as np
+    import torch
     
     field_data = memory.get('field_data')
     if field_data is None or target_pattern is None:
@@ -772,14 +773,14 @@ def field_pattern_matching(memory: MemoryField, target_pattern: Any,
         if len(target_pattern) != len(field_data):
             # Simple interpolation for size matching
             from scipy import interpolate
-            x_old = np.linspace(0, 1, len(target_pattern))
-            x_new = np.linspace(0, 1, len(field_data))
+            x_old = torch.linspace(0, 1, len(target_pattern))
+            x_new = torch.linspace(0, 1, len(field_data))
             f = interpolate.interp1d(x_old, target_pattern, kind='linear')
             target_pattern = f(x_new)
     
     # Calculate similarity
-    correlation = np.corrcoef(field_data.flatten(), target_pattern.flatten())[0, 1]
-    if np.isnan(correlation):
+    correlation = torch.corrcoef(torch.stack([field_data.flatten().float(), target_pattern.flatten().float()]))[0, 1]
+    if torch.isnan(correlation):
         correlation = 0.0
     
     similarity = abs(correlation)
@@ -789,12 +790,12 @@ def field_pattern_matching(memory: MemoryField, target_pattern: Any,
     if match:
         # Weighted integration maintaining energy conservation
         integration_weight = 0.05
-        original_norm = np.linalg.norm(field_data)
+        original_norm = torch.linalg.norm(field_data)
         
         updated_field = (1 - integration_weight) * field_data + integration_weight * target_pattern
         
         # Renormalize to maintain energy conservation
-        new_norm = np.linalg.norm(updated_field)
+        new_norm = torch.linalg.norm(updated_field)
         if new_norm > 1e-12:
             updated_field = updated_field * (original_norm / new_norm)
         
@@ -833,7 +834,7 @@ def physics_field_optimization(memory: MemoryField, objective_func: Callable,
     Returns:
         Optimization results with conservation metrics
     """
-    import numpy as np
+    import torch
     
     field_data = memory.get('field_data')
     if field_data is None:
@@ -850,7 +851,7 @@ def physics_field_optimization(memory: MemoryField, objective_func: Callable,
         # Simple gradient-free optimization with conservation constraints
         
         # Generate candidate perturbation
-        perturbation = np.random.normal(0, learning_rate, field_data.shape)
+        perturbation = torch.randn(field_data.shape) * learning_rate
         candidate_field = field_data + perturbation
         
         # Enforce conservation on candidate
@@ -914,7 +915,7 @@ def resonance_field_interaction(memory: MemoryField, frequency: float, amplitude
     Returns:
         Resonance interaction results with conservation metrics
     """
-    import numpy as np
+    import torch
     
     # Check if memory has physics support
     if hasattr(memory, 'create_resonance_pattern'):
@@ -949,19 +950,19 @@ def resonance_field_interaction(memory: MemoryField, frequency: float, amplitude
     
     # Generate resonance pattern
     field_size = len(field_data)
-    x = np.linspace(0, 2*np.pi, field_size)
-    pattern = amplitude * np.sin(frequency * x) * np.exp(-0.1 * x)
+    x = torch.linspace(0, 2*math.pi, field_size)
+    pattern = amplitude * torch.sin(frequency * x) * torch.exp(-0.1 * x)
     
     # Apply amplification with conservation
-    original_energy = 0.5 * np.sum(field_data**2)
+    original_energy = 0.5 * torch.sum(field_data**2)
     weight = min(0.2, amplification_factor / 100)
     
     amplified_field = field_data + weight * pattern * amplification_factor
     
     # Enforce energy conservation
-    new_energy = 0.5 * np.sum(amplified_field**2)
+    new_energy = 0.5 * torch.sum(amplified_field**2)
     if new_energy > 1e-12:
-        amplified_field *= np.sqrt(original_energy / new_energy)
+        amplified_field *= torch.sqrt(torch.tensor(original_energy / new_energy))
     
     memory.set('field_data', amplified_field)
     
@@ -969,9 +970,9 @@ def resonance_field_interaction(memory: MemoryField, frequency: float, amplitude
         'success': True,
         'pattern_frequency': frequency,
         'amplification_factor': amplification_factor,
-        'energy_conserved': abs(original_energy - 0.5 * np.sum(amplified_field**2)) < 1e-10,
+        'energy_conserved': abs(original_energy - 0.5 * torch.sum(amplified_field**2)) < 1e-10,
         'original_energy': original_energy,
-        'final_energy': 0.5 * np.sum(amplified_field**2)
+        'final_energy': 0.5 * torch.sum(amplified_field**2)
     }
 
 
@@ -993,7 +994,7 @@ def entropy_driven_collapse(memory: MemoryField, entropy_threshold: float = 0.3,
     Returns:
         Collapse results with conservation metrics
     """
-    import numpy as np
+    import torch
     
     # Check if memory has physics support
     if hasattr(memory, 'collapse_to_dominant_mode'):
@@ -1018,18 +1019,18 @@ def entropy_driven_collapse(memory: MemoryField, entropy_threshold: float = 0.3,
         return {'collapse_occurred': False, 'reason': 'no_collapse_needed'}
     
     # Perform collapse based on mode
-    original_norm = np.linalg.norm(field_data)
+    original_norm = torch.linalg.norm(field_data)
     
     if collapse_mode == "rapid" or current_entropy < 0.1:
         # Single dominant mode
-        max_idx = np.argmax(np.abs(field_data))
-        collapsed_field = np.zeros_like(field_data)
+        max_idx = torch.argmax(torch.abs(field_data))
+        collapsed_field = torch.zeros_like(field_data)
         collapsed_field[max_idx] = field_data[max_idx]
         
     elif collapse_mode == "gradual":
         # Preserve stronger modes
-        abs_field = np.abs(field_data)
-        threshold = np.percentile(abs_field, (1 - current_entropy) * 100)
+        abs_field = torch.abs(field_data)
+        threshold = torch.quantile(abs_field.float(), (1 - current_entropy))
         collapsed_field = field_data.copy()
         
         weak_mask = abs_field < threshold
@@ -1039,15 +1040,15 @@ def entropy_driven_collapse(memory: MemoryField, entropy_threshold: float = 0.3,
         # Adaptive based on current entropy
         if current_entropy < 0.2:
             # More aggressive collapse
-            top_indices = np.argsort(np.abs(field_data))[-3:]  # Keep top 3
-            collapsed_field = np.zeros_like(field_data)
+            top_indices = torch.argsort(torch.abs(field_data))[-3:]  # Keep top 3
+            collapsed_field = torch.zeros_like(field_data)
             collapsed_field[top_indices] = field_data[top_indices]
         else:
             # Gentler collapse
             collapsed_field = field_data * (current_entropy + 0.2)
     
     # Maintain energy conservation
-    new_norm = np.linalg.norm(collapsed_field)
+    new_norm = torch.linalg.norm(collapsed_field)
     if new_norm > 1e-12:
         collapsed_field *= (original_norm / new_norm)
     
@@ -1058,7 +1059,7 @@ def entropy_driven_collapse(memory: MemoryField, entropy_threshold: float = 0.3,
         'entropy_threshold': entropy_threshold,
         'collapse_mode': collapse_mode,
         'original_entropy': current_entropy,
-        'energy_conserved': abs(original_norm - np.linalg.norm(collapsed_field)) < 1e-10
+        'energy_conserved': abs(original_norm - torch.linalg.norm(collapsed_field)) < 1e-10
     }
 
 
@@ -1088,13 +1089,13 @@ def cognitive_pattern_extraction(memory: MemoryField, pattern_type: str = "memor
     if field_data is None:
         return {'patterns': [], 'pattern_type': pattern_type, 'success': False}
     
-    import numpy as np
+    import torch
     patterns = []
     
     if pattern_type == "memory":
         # Simple memory pattern detection
-        abs_field = np.abs(field_data)
-        strong_points = np.where(abs_field > extraction_threshold)[0]
+        abs_field = torch.abs(field_data)
+        strong_points = torch.where(abs_field > extraction_threshold)[0]
         
         for i, point in enumerate(strong_points):
             patterns.append({
@@ -1106,9 +1107,9 @@ def cognitive_pattern_extraction(memory: MemoryField, pattern_type: str = "memor
     
     elif pattern_type == "attention":
         # Attention from gradients
-        gradient = np.gradient(field_data)
-        attention_strength = np.abs(gradient)
-        high_attention = np.where(attention_strength > extraction_threshold)[0]
+        gradient = torch.gradient(field_data)
+        attention_strength = torch.abs(gradient)
+        high_attention = torch.where(attention_strength > extraction_threshold)[0]
         
         for i, point in enumerate(high_attention):
             patterns.append({
@@ -1122,9 +1123,9 @@ def cognitive_pattern_extraction(memory: MemoryField, pattern_type: str = "memor
         # General statistical patterns
         patterns.append({
             'type': 'statistical_pattern',
-            'mean': float(np.mean(field_data)),
-            'std': float(np.std(field_data)),
-            'energy': float(0.5 * np.sum(field_data**2)),
+            'mean': float(torch.mean(field_data)),
+            'std': float(torch.std(field_data)),
+            'energy': float(0.5 * torch.sum(field_data**2)),
             'id': 'stats_0'
         })
     
@@ -1154,7 +1155,7 @@ def superfluid_memory_dynamics(memory: MemoryField, viscosity: float = 0.01,
     Returns:
         Superfluid dynamics results
     """
-    import numpy as np
+    import torch
     
     field_data = memory.get('field_data')
     if field_data is None:
@@ -1162,22 +1163,22 @@ def superfluid_memory_dynamics(memory: MemoryField, viscosity: float = 0.01,
     
     # Implement superfluid-like dynamics
     # Phase calculation for superfluid order parameter
-    amplitude = np.abs(field_data)
-    phase = np.angle(field_data + 1j * np.gradient(field_data))
+    amplitude = torch.abs(field_data)
+    phase = torch.angle(field_data + 1j * torch.gradient(field_data))
     
     # Superfluid velocity (gradient of phase)
-    velocity = np.gradient(phase) * flow_rate
+    velocity = torch.gradient(phase) * flow_rate
     
     # Apply viscous damping
     damped_velocity = velocity * (1 - viscosity)
     
     # Update field with superfluid dynamics
     new_phase = phase + damped_velocity * 0.01  # Small time step
-    new_field = amplitude * np.cos(new_phase)
+    new_field = amplitude * torch.cos(new_phase)
     
     # Ensure conservation
-    original_norm = np.linalg.norm(field_data)
-    new_norm = np.linalg.norm(new_field)
+    original_norm = torch.linalg.norm(field_data)
+    new_norm = torch.linalg.norm(new_field)
     if new_norm > 1e-12:
         new_field *= (original_norm / new_norm)
     
@@ -1189,7 +1190,7 @@ def superfluid_memory_dynamics(memory: MemoryField, viscosity: float = 0.01,
         'success': True,
         'viscosity': viscosity,
         'flow_rate': flow_rate,
-        'average_velocity': float(np.mean(np.abs(damped_velocity))),
-        'phase_coherence': float(np.std(new_phase)),
+        'average_velocity': float(torch.mean(torch.abs(damped_velocity))),
+        'phase_coherence': float(torch.std(new_phase)),
         'energy_conserved': abs(original_norm - new_norm) < 1e-10
     }

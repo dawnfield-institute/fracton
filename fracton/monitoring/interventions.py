@@ -8,7 +8,7 @@ based on PAC tree health to encourage generalization over memorization.
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional, Any, Callable
-import numpy as np
+import torch
 
 
 class InterventionType(Enum):
@@ -73,36 +73,36 @@ class InterventionApplicator:
         self.config = config or InterventionConfig()
     
     def apply_noise(
-        self, 
-        embeddings: np.ndarray, 
+        self,
+        embeddings: torch.Tensor,
         strength: float
-    ) -> np.ndarray:
+    ) -> torch.Tensor:
         """Add Gaussian noise to embeddings."""
-        noise = np.random.normal(0, strength, embeddings.shape)
+        noise = torch.randn(embeddings.shape) * strength
         return embeddings + noise
-    
+
     def apply_token_masking(
-        self, 
-        token_ids: np.ndarray,
+        self,
+        token_ids: torch.Tensor,
         mask_token_id: int,
         ratio: float
-    ) -> np.ndarray:
+    ) -> torch.Tensor:
         """Randomly mask tokens."""
-        mask = np.random.random(token_ids.shape) < ratio
-        masked = token_ids.copy()
+        mask = torch.rand(token_ids.shape) < ratio
+        masked = token_ids.clone()
         masked[mask] = mask_token_id
         return masked
-    
+
     def apply_position_perturbation(
-        self, 
-        positions: np.ndarray,
+        self,
+        positions: torch.Tensor,
         max_shift: int
-    ) -> np.ndarray:
+    ) -> torch.Tensor:
         """Slightly shuffle position indices."""
-        shifts = np.random.randint(-max_shift, max_shift + 1, positions.shape)
+        shifts = torch.randint(-max_shift, max_shift + 1, positions.shape)
         perturbed = positions + shifts
-        # Clip to valid range
-        perturbed = np.clip(perturbed, 0, positions.max())
+        # Clamp to valid range
+        perturbed = torch.clamp(perturbed, 0, positions.max())
         return perturbed
 
 

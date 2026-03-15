@@ -8,7 +8,7 @@ and detects branches that could benefit from byref optimization.
 from dataclasses import dataclass, field
 from typing import Dict, List, Set, Tuple, Optional, Any
 from collections import deque
-import numpy as np
+import math
 
 from .pac_tree_monitor import (
     PatternType, 
@@ -179,7 +179,7 @@ def _compute_zone_entropy(
     ]
     if not entropies:
         return 0.0
-    return float(np.mean(entropies))
+    return sum(entropies) / len(entropies)
 
 
 def detect_byref_candidates(
@@ -248,8 +248,8 @@ def _compute_branch_similarity(p1: PatternProfile, p2: PatternProfile) -> float:
     child_sim = 1.0 - abs(p1.child_count - p2.child_count) / max_children
     
     # Activation count similarity (log scale)
-    log_a1 = np.log1p(p1.activation_count)
-    log_a2 = np.log1p(p2.activation_count)
+    log_a1 = math.log1p(p1.activation_count)
+    log_a2 = math.log1p(p2.activation_count)
     max_log = max(log_a1, log_a2, 1)
     activation_sim = 1.0 - abs(log_a1 - log_a2) / max_log
     
@@ -319,7 +319,7 @@ class LanguageGeneralizationMonitor:
         self, 
         pattern_id: str, 
         context_id: str,
-        embedding: Optional[np.ndarray] = None
+        embedding = None
     ) -> None:
         """Record a pattern activation."""
         self.tree_monitor.record_activation(pattern_id, context_id, embedding)
@@ -377,7 +377,8 @@ class LanguageGeneralizationMonitor:
         
         # Zone health
         if self._zones:
-            avg_zone_health = np.mean([z.health_score for z in self._zones])
+            zone_scores = [z.health_score for z in self._zones]
+            avg_zone_health = sum(zone_scores) / len(zone_scores)
             largest_zone = max(self._zones, key=lambda z: z.size)
         else:
             avg_zone_health = 0.0

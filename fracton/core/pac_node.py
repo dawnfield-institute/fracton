@@ -16,7 +16,7 @@ from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, field
 import time
 
-from ..physics.constants import XI, PHI_XI, LAMBDA_STAR
+from ..physics.constants import XI_SEC, PHI_XI, LAMBDA_STAR
 from ..physics.phase_transitions import PhaseState, detect_phase
 
 
@@ -78,7 +78,7 @@ class PACNode:
     
     def should_collapse(self) -> bool:
         """Check if this node should collapse to parent."""
-        return self.potential <= XI
+        return self.potential <= XI_SEC
     
     def update_phase(self) -> PhaseState:
         """Update and return current phase based on potential."""

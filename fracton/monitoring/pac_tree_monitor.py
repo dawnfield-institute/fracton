@@ -8,7 +8,7 @@ pattern formation and detecting overfitting vs generalization.
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Set, Optional, Any
-import numpy as np
+import torch
 
 
 class PatternType(Enum):
@@ -142,10 +142,10 @@ class PACTreeMonitor:
         self.pac_tree = pac_tree
     
     def record_activation(
-        self, 
-        pattern_id: str, 
+        self,
+        pattern_id: str,
         context_id: str,
-        embedding: Optional[np.ndarray] = None
+        embedding: Optional[torch.Tensor] = None
     ) -> None:
         """
         Record a pattern activation.
@@ -171,7 +171,7 @@ class PACTreeMonitor:
         profile.last_activation_step = self._current_step
         
         if embedding is not None:
-            profile.embedding_norm = float(np.linalg.norm(embedding))
+            profile.embedding_norm = float(torch.linalg.norm(embedding))
         
         self._tokens_seen += 1
     

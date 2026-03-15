@@ -9,7 +9,7 @@ import logging
 from collections import deque
 from typing import Dict, List, Optional, Set, Tuple
 
-import numpy as np
+import torch
 
 from fracton.storage.confidence import (
     GeometricConfidence,
@@ -440,9 +440,9 @@ class KronosGraph:
                 )
 
                 if parent_full is not None and reconstructed is not None:
-                    error = np.linalg.norm(reconstructed - parent_full) / np.linalg.norm(
+                    error = torch.linalg.norm(reconstructed - parent_full).item() / torch.linalg.norm(
                         parent_full
-                    )
+                    ).item()
                     if error > tolerance:
                         logger.warning(
                             f"PAC conservation violated for {node_id}: "
@@ -452,7 +452,7 @@ class KronosGraph:
 
         return True
 
-    def _reconstruct_embedding(self, node: KronosNode) -> Optional[np.ndarray]:
+    def _reconstruct_embedding(self, node: KronosNode) -> Optional[torch.Tensor]:
         """
         Reconstruct full embedding by summing deltas to root.
 

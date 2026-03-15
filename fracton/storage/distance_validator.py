@@ -24,7 +24,7 @@ References:
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
-import numpy as np
+import math
 import torch
 
 
@@ -218,7 +218,7 @@ class DistanceValidator:
                 branching_factors.append(bf)
 
         avg_branching = (
-            np.mean(branching_factors) if branching_factors else 1.0
+            sum(branching_factors) / len(branching_factors) if branching_factors else 1.0
         )
 
         # Compute scaling factor (distance ratio)
@@ -237,11 +237,11 @@ class DistanceValidator:
                 if dist_i > 0:
                     scaling_factors.append(dist_i1 / dist_i)
 
-        avg_scaling = np.mean(scaling_factors) if scaling_factors else 1.0
+        avg_scaling = sum(scaling_factors) / len(scaling_factors) if scaling_factors else 1.0
 
         # Compute fractal dimension
         if avg_scaling > 0 and avg_scaling != 1.0:
-            fractal_dim = np.log(avg_branching) / np.log(1.0 / avg_scaling)
+            fractal_dim = math.log(avg_branching) / math.log(1.0 / avg_scaling)
         else:
             fractal_dim = 0.0
 
@@ -356,4 +356,4 @@ class DistanceValidator:
                 dist = torch.norm(embeddings[i] - embeddings[j]).item()
                 distances.append(dist)
 
-        return np.mean(distances) if distances else 0.0
+        return sum(distances) / len(distances) if distances else 0.0

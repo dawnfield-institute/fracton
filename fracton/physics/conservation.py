@@ -9,11 +9,10 @@ used throughout Fracton and GAIA.
 """
 
 import torch
-import numpy as np
 from typing import List, Tuple, Union, Optional
 from dataclasses import dataclass
 
-from .constants import XI, PHI_XI, LAMBDA_STAR
+from .constants import XI_SEC, PHI_XI, LAMBDA_STAR
 
 
 @dataclass

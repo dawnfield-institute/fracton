@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from collections import OrderedDict
 
 from .pac_node import PACNode, PACNodeFactory
-from ..physics.constants import XI, PHI_XI, LAMBDA_STAR
+from ..physics.constants import XI_SEC, PHI_XI, LAMBDA_STAR
 from ..physics.conservation import validate_pac, compute_residual
 from ..physics.phase_transitions import PhaseState, detect_phase, should_collapse
 
@@ -413,7 +413,7 @@ class PACSystem:
         self.cache.remove(node.id)
         self._node_ids.discard(node.id)
     
-    def garbage_collect(self, potential_threshold: float = XI / 2) -> int:
+    def garbage_collect(self, potential_threshold: float = XI_SEC / 2) -> int:
         """
         Remove nodes with potential below threshold.
         

@@ -919,54 +919,63 @@ class PhysicsEntropyDispatcher(EntropyDispatcher):
     
     def _amplify_pattern(self, field_data, pattern, factor: float):
         """Amplify pattern in field data while maintaining physics constraints."""
-        import numpy as np
-        
+        import torch
+
         if len(pattern) != len(field_data):
-            # Resize pattern to match field
-            pattern = np.interp(np.linspace(0, 1, len(field_data)), 
-                              np.linspace(0, 1, len(pattern)), pattern)
-        
+            # Resize pattern to match field using linear interpolation
+            x_old = torch.linspace(0, 1, len(pattern))
+            x_new = torch.linspace(0, 1, len(field_data))
+            indices = torch.searchsorted(x_old, x_new).clamp(1, len(x_old) - 1)
+            x0 = x_old[indices - 1]
+            x1 = x_old[indices]
+            y0 = pattern[indices - 1]
+            y1 = pattern[indices]
+            weights = (x_new - x0) / (x1 - x0 + 1e-12)
+            pattern = y0 + weights * (y1 - y0)
+
         # Weighted amplification
         weight = min(factor, 2.0)  # Cap amplification
         amplified = field_data * (1 - weight * 0.1) + pattern * (weight * 0.1)
-        
+
         # Maintain field norm (energy conservation)
-        original_norm = np.linalg.norm(field_data)
-        new_norm = np.linalg.norm(amplified)
+        original_norm = torch.linalg.norm(torch.as_tensor(field_data, dtype=torch.float32))
+        new_norm = torch.linalg.norm(torch.as_tensor(amplified, dtype=torch.float32))
         if new_norm > 1e-12:
             amplified = amplified * (original_norm / new_norm)
-            
+
         return amplified
-    
+
     def _gradual_collapse(self, field_data, collapse_rate: float = 0.1):
         """Gradual field collapse preserving dominant modes."""
-        import numpy as np
-        
+        import torch
+
         # Find dominant components
-        abs_field = np.abs(field_data)
-        threshold = np.percentile(abs_field, (1 - collapse_rate) * 100)
-        
+        abs_field = torch.abs(torch.as_tensor(field_data, dtype=torch.float32))
+        threshold = torch.quantile(abs_field.float(), 1 - collapse_rate).item()
+
         # Preserve strong components, reduce weak ones
-        collapsed = field_data.copy()
+        collapsed = field_data.clone() if hasattr(field_data, 'clone') else torch.tensor(field_data)
         mask = abs_field < threshold
         collapsed[mask] *= 0.5  # Reduce weak components
-        
+
         return collapsed
-    
+
     def _rapid_collapse(self, field_data):
         """Rapid collapse to dominant mode."""
-        import numpy as np
-        
+        import torch
+
+        field_t = torch.as_tensor(field_data, dtype=torch.float32)
+
         # Find strongest component
-        max_idx = np.argmax(np.abs(field_data))
+        max_idx = torch.argmax(torch.abs(field_t)).item()
         max_value = field_data[max_idx]
-        
+
         # Create collapsed state
-        collapsed = np.zeros_like(field_data)
+        collapsed = torch.zeros_like(field_t)
         collapsed[max_idx] = max_value
-        
+
         # Maintain some field energy distribution
-        total_energy = np.sum(field_data**2)
+        total_energy = torch.sum(field_t**2).item()
         collapsed_energy = collapsed[max_idx]**2
         
         if collapsed_energy > 1e-12:
