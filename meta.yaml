@@ -1,41 +1,43 @@
 schema_version: '2.0'
 directory_name: fracton
-description: The fracton directory contains test modules and testing utilities for
-  the fracton functionality. It includes unit tests, integration tests, and test fixtures
-  to ensure code quality and reliability.
+description: >
+  Fracton — the Infodynamics SDK and computational substrate for Dawn Field Theory.
+  Provides core primitives (RecursiveEngine, MemoryField, PAC regulation), language
+  constructs (@recursive, @entropy_gate), KRONOS v2 storage layer, and Mobius tensor
+  operations. Version 2.1.0. ~637 tests, ~56 public API exports.
+  Used by dawn-field-theory (Feigenbaum research), reality-engine (PAC/Mobius simulations),
+  and dawn-models (GAIA v2 conservation bus).
 semantic_scope:
-- fracton
+  - infodynamics-sdk
+  - pac-conservation
+  - recursive-engine
+  - entropy-dispatch
+  - memory-field
+  - mobius-tensor
+  - kronos-storage
+  - feigenbaum
+  - fracton
 files:
-- .gitignore
-- ARCHITECTURE.md
-- LICENSE
-- pytest.ini
-- README.md
-- requirements-dev.txt
-- ROADMAP.md
-- SETUP.md
-- setup.py
-- SPEC.md
-- STATUS.md
-- validate_fracton.py
+  - .gitignore
+  - ARCHITECTURE.md
+  - LICENSE
+  - pytest.ini
+  - README.md
+  - requirements-dev.txt
+  - ROADMAP.md
+  - SETUP.md
+  - setup.py
+  - SPEC.md
+  - STATUS.md
+  - validate_fracton.py
 child_directories:
-- .cip
-- cognition
-- examples
-- fracton
-- gaia
-- roadmaps
-- tests
-- todo
-title: fracton
-repository_role: theory
-generation_context:
-  generator: ai_enhanced
-  file_count: 13
-  directory_count: 8
-  primary_file_types:
-    .md: 6
-    .yaml: 1
-    .ini: 1
-    .txt: 1
-    .py: 2
+  - .cip
+  - cognition
+  - examples
+  - fracton
+  - gaia
+  - roadmaps
+  - tests
+  - todo
+title: Fracton SDK
+repository_role: sdk
