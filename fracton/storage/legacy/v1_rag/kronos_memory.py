@@ -29,7 +29,7 @@ from .backends.base import GraphNode, GraphEdge, VectorPoint, TemporalPath
 from .backend_factory import BackendFactory
 from .embeddings import EmbeddingService, create_embedding_service
 from .foundation_integration import FoundationIntegration
-from ..physics.constants import XI, PHI_XI, LAMBDA_STAR
+from ..physics.constants import XI_SEC as XI, PHI_XI, LAMBDA_STAR
 from ..physics.phase_transitions import detect_phase
 
 logger = logging.getLogger(__name__)

@@ -8,12 +8,15 @@ throughout the Fracton ecosystem and GAIA.
 
 from .constants import (
     # Primary constants
-    PHI, XI_SEC, XI, PHI_XI, LAMBDA_STAR,
+    PHI, XI_SEC, PHI_XI, LAMBDA_STAR,
     # Derived thresholds
     SEC_EXPAND_THRESHOLD, SEC_COLLAPSE_THRESHOLD,
     # Validation
     validate_conservation, validate_sec_threshold
 )
+# Backward compat: XI was an alias for XI_SEC, removed in Project Homework.
+# Consumers should use XI_SEC explicitly.
+XI = XI_SEC
 
 from .conservation import (
     PACValidator,

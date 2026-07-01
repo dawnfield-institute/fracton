@@ -41,8 +41,9 @@ Named XI_SEC to distinguish from the balance constant XI ≈ 1.0584 (γ + ln(φ)
 defined in fracton.constants.mathematical.
 """
 
-# Backward compat alias — will be removed in 3.0
-XI: float = XI_SEC
+# XI alias removed in Project Homework (2026-03-23).
+# Use XI_SEC for SEC collapse threshold (0.0618).
+# Use fracton.constants.mathematical.XI for the balance constant (1.0584).
 
 # SEC Expansion Threshold: φ⁻¹ / φ² = φ⁻³ ≈ 0.1459 → rounded to 0.1
 # Alternative derivation: 1/10 (decimal scaling for practical thresholds)
@@ -137,7 +138,6 @@ def validate_sec_threshold(potential: float) -> str:
 CONSTANTS_DICT = {
     "PHI": PHI,
     "XI_SEC": XI_SEC,
-    "XI": XI,  # backward compat
     "PHI_XI": PHI_XI,
     "LAMBDA_STAR": LAMBDA_STAR,
     "SEC_EXPAND_THRESHOLD": SEC_EXPAND_THRESHOLD,
@@ -151,16 +151,16 @@ if __name__ == "__main__":
     print("=" * 50)
     print(f"PHI (φ):           {PHI:.10f}")
     print(f"PHI_INV (φ⁻¹):     {PHI_INV:.10f}")
-    print(f"XI (φ⁻¹/10):       {XI:.10f}")
+    print(f"XI_SEC (φ⁻¹/10):   {XI_SEC:.10f}")
     print(f"PHI_XI:            {PHI_XI:.10f}")
     print(f"LAMBDA_STAR:       {LAMBDA_STAR:.10f}")
     print()
     print("SEC Thresholds:")
-    print(f"  Collapse (< XI):   {SEC_COLLAPSE_THRESHOLD:.10f}")
-    print(f"  Stable band:       [{XI:.4f}, {PHI_XI:.4f}]")
+    print(f"  Collapse (< XI_SEC): {SEC_COLLAPSE_THRESHOLD:.10f}")
+    print(f"  Stable band:         [{XI_SEC:.4f}, {PHI_XI:.4f}]")
     print(f"  Expand (> PHI_XI): {SEC_EXPAND_THRESHOLD:.10f}")
     print()
     print("Derivation Check:")
-    print(f"  XI = PHI_INV/10:   {PHI_INV/10:.10f} ✓")
+    print(f"  XI_SEC = PHI_INV/10: {PHI_INV/10:.10f} ✓")
     print(f"  XI_INV = 10*PHI:   {10*PHI:.10f} = {XI_INV:.10f} ✓")
     print(f"  PHI - 1 = PHI_INV: {PHI-1:.10f} = {PHI_INV:.10f} ✓")
