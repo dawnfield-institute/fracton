@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "fracton"
@@ -31,15 +31,25 @@ classifiers = [
 
 dependencies = [
     "torch>=2.0.0",
+    "numpy>=1.24",
+    "PyYAML>=6.0",
+    "scipy>=1.10",
 ]
 
 [project.optional-dependencies]
+# Storage backends. Each guards its own import with try/except, so the package
+# works without them — install the extra for the backend you actually use.
+chroma = ["chromadb>=0.4"]
+neo4j = ["neo4j>=5.0"]
+qdrant = ["qdrant-client>=1.7"]
+embeddings = ["sentence-transformers>=2.2"]
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
     "pytest-mock>=3.10.0",
     "pytest-timeout>=2.1.0",
     "pytest-xdist>=3.0.0",
+    "pytest-asyncio>=0.23",
     "hypothesis>=6.70.0",
     "black>=23.0.0",
     "mypy>=1.0.0",
